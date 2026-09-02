@@ -707,4 +707,93 @@ export default defineSchema({
     .index("by_entityType_entityId", ["entityType", "entityId"])
     .index("by_status", ["status"])
     .index("by_createdAt", ["createdAt"]),
+
+  // ==========================================
+  // n8n WORKFLOW AUTOMATION & EVENTS (STEP 8)
+  // ==========================================
+
+  domainEvents: defineTable({
+    eventId: v.string(),
+    eventType: v.string(),
+    version: v.string(),
+    occurredAt: v.number(),
+    actor: v.object({
+      type: v.string(),
+      id: v.optional(v.string()),
+    }),
+    source: v.object({
+      system: v.string(),
+      service: v.string(),
+    }),
+    aggregate: v.object({
+      type: v.string(),
+      id: v.string(),
+    }),
+    correlationId: v.string(),
+    payload: v.any(),
+    metadata: v.optional(v.any()),
+    deliveryStatus: v.union(
+      v.literal("PENDING"),
+      v.literal("DELIVERED"),
+      v.literal("FAILED"),
+      v.literal("DEAD_LETTER")
+    ),
+    deliveryAttempts: v.number(),
+    lastDeliveredAt: v.optional(v.number()),
+  })
+    .index("by_eventType", ["eventType"])
+    .index("by_correlationId", ["correlationId"])
+    .index("by_deliveryStatus", ["deliveryStatus"])
+    .index("by_occurredAt", ["occurredAt"]),
+
+  workflowExecutions: defineTable({
+    executionId: v.string(),
+    workflowName: v.string(),
+    workflowVersion: v.string(),
+    eventId: v.string(),
+    correlationId: v.string(),
+    status: v.union(
+      v.literal("RECEIVED"),
+      v.literal("PROCESSING"),
+      v.literal("COMPLETED"),
+      v.literal("FAILED"),
+      v.literal("RETRYING"),
+      v.literal("DEAD_LETTER")
+    ),
+    attemptCount: v.number(),
+    lastAttemptAt: v.number(),
+    completedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+    idempotencyKey: v.string(),
+    actionsTaken: v.array(v.string()),
+  })
+    .index("by_idempotencyKey", ["idempotencyKey"])
+    .index("by_workflowName", ["workflowName"])
+    .index("by_status", ["status"])
+    .index("by_eventId", ["eventId"]),
+
+  workflowEscalations: defineTable({
+    escalationId: v.string(),
+    workflowName: v.string(),
+    severity: v.union(
+      v.literal("LOW"),
+      v.literal("MEDIUM"),
+      v.literal("HIGH"),
+      v.literal("CRITICAL")
+    ),
+    entityType: v.string(),
+    entityId: v.string(),
+    reason: v.string(),
+    assignedRole: v.string(),
+    status: v.union(
+      v.literal("ACTIVE"),
+      v.literal("ACKNOWLEDGED"),
+      v.literal("RESOLVED")
+    ),
+    createdAt: v.number(),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_status", ["status"])
+    .index("by_severity", ["severity"])
+    .index("by_createdAt", ["createdAt"]),
 });

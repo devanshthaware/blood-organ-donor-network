@@ -75,60 +75,40 @@ Blood and organ donor management is one of healthcare's most time-critical logis
 - **Immutable Audit Logging (`/admin/audit-logs`):**
   - Complete tamper-evident record of all system events (`REQUEST_CREATED`, `RESERVATION_ACCEPTED`, `RESERVATION_CONFIRMED`, `INVENTORY_CHANGED`).
   - Tracks user ID, user email, IP address, timestamp, resource ID, and execution status (`SUCCESS` / `FAILURE` / `ERROR`).
-- **Entity Management:** Directory of all registered donors, verification states, hospital accreditations, and regional assignment.
-
----
-
-## 🏗️ System Architecture
+- **Entity Management:** Directory of all registered donors, verification states, hospital accreditations, an## 🏗️ System Architecture
 
 VeinLink adheres to strict architectural isolation principles:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 Next.js 16 Web Application                 │
-│       (Role-Based UI: Donors, Hospitals, System Admins)     │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Authenticated with Clerk JWT
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   Convex Realtime Backend                   │
-│             (Primary Data Store & Business Logic)           │
-│                                                             │
-│  • users              • donors            • hospitals       │
-│  • donationRequests   • reservations      • bloodInventory  │
-│  • alerts             • auditLogs         • aiEvents        │
-│  • patients           • checkupRequests   • mlOutputs       │
-│                                                             │
-│  [Mutations]: Atomic ACID updates & inventory reconciliation│
-│  [Queries]: Live WebSocket subscriptions                    │
-│  [Actions]: Isolated HTTP calls to FastAPI ML               │
-│  [Crons]: Automatic reservation expiry sweeping             │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Calls ML REST APIs from Actions
-                               ▼
-┌──────────────────────────────┐ ┌────────────────────────────┐
-│      FastAPI ML Service      │ │  LLM Explanation Service   │
-│   (Predictive Scikit-Learn)  │ │ (OpenAI / Claude / Gemma / │
-│                              │ │  Deterministic Fallback)   │
-│ • Demand Forecasting Model   │ │                            │
-│ • Donor Reliability Model    │ │ • Converts scores to       │
-│ • Donor Availability Model   │ │   human-readable rationale │
-└──────────────────────────────┘ └────────────────────────────┘
-```
+```text
+                         ┌──────────────────────┐
+                         │      Next.js         │
+                         │   Role-based UI      │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │ Clerk Authentication │
+                         └──────────┬───────────┘
+                                    │
+                                    ▼
+                         ┌──────────────────────┐
+                         │       Convex         │
+                         │ System of Record     │
+                         │ Domain + Policies    │
+                         └─────┬─────────┬──────┘
+                               │         │
+                     Domain    │         │ Intelligence
+                     Events    │         │ Requests
+                               ▼         ▼
+                        ┌──────────┐  ┌──────────┐
+                 ### Core Architectural Invariants:
+1. **Convex as System of Record:** Convex holds authoritative state for all blood inventory, organ viability, waitlist priorities, and audit logs.
+2. **Strict Human Gate:** Sensitive medical operations (organ allocation, medical eligibility overrides) require authenticated human coordinator approval.
+3. **Decoupled AI & CV Inference:** If the ML backend experiences latency or downtime, deterministic fallback engines take over without blocking healthcare workflows.
+4. **Idempotent Automation:** n8n processes domain events with unique idempotency keys, preventing duplicate emergency alerts.
+5. **Complete Auditability:** Every domain event, workflow escalation, and human decision is immutably persisted in `auditLogs` and `domainEvents`.
 
-### Core Architectural Invariants:
-1. **Zero Direct Frontend-to-ML Access:** The Next.js frontend never calls ML endpoints directly. All ML inference is orchestrated by Convex Actions (`convex/matching.ts`).
-2. **ACID Transactional Guarantees:** When a donor accepts a reservation, the reservation state, donation request fulfillment count, and inventory are updated within a single atomic Convex mutation, preventing double-allocation.
-3. **Reactive Subscriptions:** All user interfaces automatically update in real-time via WebSocket connections without polling.ML REST APIs            │ Sends context
-               ▼                               ▼
-┌──────────────────────────────┐ ┌────────────────────────────┐
-│      FastAPI ML Service      │ │  LLM Explanation Service   │
-│   (Predictive Scikit-Learn)  │ │ (OpenAI / Claude / Gemma / │
-│                              │ │  Deterministic Fallback)   │
-│ • Demand Forecasting Model   │ │                            │
-│ • Donor Reliability Model    │ │ • Converts scores to       │
-│ • Donor Availability Model   │ │   human-readable rationale │
-└──────────────────────────────┘ └────────────────────────────┘
+---��─────────────────┘
 ```
 
 ### Core Architectural Invariants:
