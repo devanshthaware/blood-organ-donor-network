@@ -1,23 +1,24 @@
 # VeinLink — Technical Requirements Document (TRD)
 
-| **Document Title** | VeinLink: Intelligent Blood Supply & Donation Management System |
+| **Document Title** | VeinLink: Unified Blood & Organ Network Intelligence Platform |
 | :--- | :--- |
 | **Document Type** | Technical Requirements Document (TRD) |
-| **Version** | 1.0.0 |
-| **Status** | Approved / Production Architecture Spec |
-| **Target Infrastructure** | Google Cloud Platform (Firestore, Cloud Functions v2, Cloud Run) |
-| **Author** | Antigravity AI & Semicolon Core Engineering Team |
+| **Version** | 2.0.0 |
+| **Status** | Approved / Active Architecture Spec |
+| **Target Infrastructure** | Convex Core (Real-Time Reactive V8 Sandbox), Clerk Auth, FastAPI ML, n8n Automation, Blockchain Provenance |
+| **Author** | Antigravity AI & Core Engineering Team |
 
 ---
 
 ## 1. Architectural Principles & Invariants
 
-VeinLink enforces four non-negotiable architectural invariants:
+VeinLink enforces five non-negotiable architectural invariants:
 
-1. **Frontend-ML Decoupling:** Client applications (Next.js frontend) must **never** invoke the Machine Learning inference API directly. All predictions, evaluations, and rank calculations are orchestrated through server-side Cloud Functions triggered by database events.
-2. **Firestore as the Event Bus & System of Record:** Every persistent entity state and transition resides in Cloud Firestore. Systems interact asynchronously by writing to collections and reacting to Firestore document write triggers.
-3. **Strict Algorithmic Explainability:** Every machine learning output is accompanied by feature inputs, model confidence scores, and structured natural language explanations persisted to `ml_outputs` and `ai_events`.
-4. **Resilient Degradation & Zero-Block Guarantee:** If external services (ML microservice or LLM API) fail, fail-safe rule engines and heuristic fallbacks immediately engage to prevent life-critical dispatch bottlenecks.
+1. **Frontend-ML Decoupling:** Client applications (Next.js frontend) must **never** invoke the Machine Learning inference API directly. All predictions, evaluations, and rank calculations are orchestrated through server-side Convex actions.
+2. **Convex as the Reactive System of Record:** Every persistent entity state and transition resides in Convex. Systems interact asynchronously through transactional ACID mutations and event triggers.
+3. **Anti-Autonomous Clinical Allocation Invariant:** Machine learning operates exclusively as decision support. Final clinical organ allocation decisions require authenticated coordinator review with recorded clinical reasons for any override.
+4. **Strict Algorithmic Explainability & Uncertainty:** Every machine learning output is accompanied by feature inputs, model confidence scores, uncertainty tiers, and structured explanations.
+5. **Zero-PHI to External Services:** Allowlist scrubbers mathematically bar donor PII and raw coordinates from ML models, LLMs, and on-chain proofs.
 
 ---
 

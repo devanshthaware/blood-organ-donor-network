@@ -1,6 +1,6 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 
 export const getDonationRequests = query({
   args: {
@@ -101,7 +101,7 @@ export const createRequest = mutation({
     }
 
     // Trigger async matching action via Convex Scheduler
-    await ctx.scheduler.runAfter(0, internal.matching.orchestrateRequestMatching, {
+    await ctx.scheduler.runAfter(0, api.matching.orchestrateRequestMatching, {
       requestId,
       hospitalId: args.hospitalId,
       bloodType: args.bloodType,

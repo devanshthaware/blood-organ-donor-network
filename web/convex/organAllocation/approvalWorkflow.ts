@@ -3,8 +3,7 @@
  * Handles authorized coordinator approvals, human overrides, and revalidation guards.
  */
 
-import { mutation, query } from "../_generated/server";
-import { actionGeneric } from "convex/server";
+import { mutation, query, action } from "../_generated/server";
 import { v } from "convex/values";
 import { requireRole, requireUser } from "../authHelpers";
 import { api } from "../_generated/api";
@@ -31,11 +30,11 @@ export const getRecommendationsForOrgan = query({
   },
 });
 
-export const generateAllocationRecommendations = actionGeneric({
+export const generateAllocationRecommendations = action({
   args: {
     organId: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     const policy = DEFAULT_ALLOCATION_POLICY;
     const currentTime = Date.now();
 

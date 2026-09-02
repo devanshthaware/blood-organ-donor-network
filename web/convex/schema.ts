@@ -8,6 +8,8 @@ export default defineSchema({
     fullName: v.string(),
     role: v.union(v.literal("donor"), v.literal("hospital"), v.literal("admin")),
     phoneNumber: v.optional(v.string()),
+    facilityId: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("ACTIVE"), v.literal("SUSPENDED"))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

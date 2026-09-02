@@ -118,7 +118,7 @@ export const getWorkflowTrace = query({
       steps: matching.map((m) => ({
         id: m._id,
         action: m.action,
-        actorRole: m.actorRole,
+        actorRole: (m as any).actorRole || (m.details as any)?.actorRole || "user",
         timestamp: m.timestamp,
         details: m.details,
       })),

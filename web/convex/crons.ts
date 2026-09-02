@@ -1,5 +1,6 @@
 import { cronJobs } from "convex/server";
 import { internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 const crons = cronJobs();
 
@@ -27,6 +28,10 @@ export const expireStaleReservations = internalMutation({
 });
 
 // Run every hour to expire pending reservations older than 60 minutes
-crons.interval("expire-stale-reservations", { hours: 1 }, expireStaleReservations as any);
+crons.interval(
+  "expire-stale-reservations",
+  { hours: 1 },
+  internal.crons.expireStaleReservations
+);
 
 export default crons;

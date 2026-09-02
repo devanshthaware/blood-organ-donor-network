@@ -47,7 +47,11 @@ export async function requireRole(
       `Unauthorized: Caller role (${result.role}) is not permitted for this operation.`
     );
   }
-  return result;
+
+  return {
+    ...result,
+    user: result.user!,
+  };
 }
 
 /**

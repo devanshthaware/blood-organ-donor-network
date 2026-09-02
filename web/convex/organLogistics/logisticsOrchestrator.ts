@@ -3,8 +3,7 @@
  * Coordinates transport request creation, option assignment, milestone progress, delay escalations, and event tracking.
  */
 
-import { mutation, query } from "../_generated/server";
-import { actionGeneric } from "convex/server";
+import { mutation, query, action } from "../_generated/server";
 import { v } from "convex/values";
 import { requireRole, requireUser } from "../authHelpers";
 import { api } from "../_generated/api";
@@ -71,11 +70,11 @@ export const getTransportDetails = query({
   },
 });
 
-export const createTransportPlanAction = actionGeneric({
+export const createTransportPlanAction = action({
   args: {
     allocationId: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     // 1. Fetch Allocation Details
     const allocation: any = await ctx.runQuery(
       (api as any).organLogistics?.logisticsOrchestrator?.getAllocationForTransport,

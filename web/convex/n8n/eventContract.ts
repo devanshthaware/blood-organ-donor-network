@@ -3,7 +3,7 @@
  * Guarantees cross-system interoperability between Convex, n8n, and external services.
  */
 
-import { createHmac } from "crypto";
+import { computeHmacSha256 } from "../trust/canonicalizer";
 
 export interface VeinLinkDomainEvent<T = Record<string, any>> {
   eventId: string;
@@ -84,7 +84,7 @@ export function generateEventSignature(
   payloadString: string,
   secret: string = process.env.N8N_WEBHOOK_SECRET || "veinlink-default-hmac-secret-2026"
 ): string {
-  return createHmac("sha256", secret).update(payloadString).digest("hex");
+  return computeHmacSha256(secret, payloadString);
 }
 
 export function verifyEventSignature(

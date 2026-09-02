@@ -4,7 +4,7 @@
  * optional ML inference assist, deterministic scoring, ranking, and explainability.
  */
 
-import { actionGeneric } from "convex/server";
+import { action } from "../_generated/server";
 import { v } from "convex/values";
 import { api } from "../_generated/api";
 import { DEFAULT_MATCHING_POLICY, MatchingPolicyConfig } from "./matchingPolicy";
@@ -13,12 +13,12 @@ import { evaluateCompatibility, calculateDistanceKm } from "./compatibilityEngin
 import { calculateCandidateScore } from "./scoringEngine";
 import { buildStructuredExplanation } from "./explanationBuilder";
 
-export const runOrganMatching = actionGeneric({
+export const runOrganMatching = action({
   args: {
     organId: v.string(),
     policyOverrides: v.optional(v.any()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     const startTime = Date.now();
     const policy: MatchingPolicyConfig = {
       ...DEFAULT_MATCHING_POLICY,

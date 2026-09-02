@@ -1,6 +1,6 @@
-import { actionGeneric } from "convex/server";
+import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 
 const COMPATIBLE_DONORS: Record<string, string[]> = {
   "O-": ["O-"],
@@ -36,7 +36,7 @@ function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: num
   return Math.round(R * c * 10) / 10;
 }
 
-export const orchestrateRequestMatching = actionGeneric({
+export const orchestrateRequestMatching = action({
   args: {
     requestId: v.string(),
     hospitalId: v.string(),
@@ -44,12 +44,12 @@ export const orchestrateRequestMatching = actionGeneric({
     urgency: v.string(),
     unitsRequested: v.number(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<any> => {
     const mlApiUrl = process.env.ML_API_URL || "http://localhost:8000";
 
     // 1. Fetch hospital details
-    const hospital = await ctx.runQuery(internal.hospitals.getHospitalById as any, {
-      hospitalId: args.hospitalId,
+    const hospital: any = await ctx.runQuery(api.hospitals.getHospitalById, {
+      hospitalId: args.hospitalId as any,
     });
 
     const hospLat = hospital?.lat ?? 19.076;
@@ -81,7 +81,7 @@ export const orchestrateRequestMatching = actionGeneric({
     }
 
     // 3. Fetch Candidate Donors
-    const allDonors = await ctx.runQuery(internal.donors.getAllDonors as any, {});
+    const allDonors: any = await ctx.runQuery(api.donors.getAllDonors, {});
     const compatibleGroups = COMPATIBLE_DONORS[args.bloodType] || [args.bloodType];
     const maxRadius = RADIUS_BY_URGENCY[args.urgency] || 100;
     const now = Date.now();
