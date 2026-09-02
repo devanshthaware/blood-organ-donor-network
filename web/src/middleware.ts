@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/donor(.*)",
@@ -6,14 +7,23 @@ const isProtectedRoute = createRouteMatcher([
   "/admin(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    // Protect routes when Clerk secret key is configured
-    if (process.env.CLERK_SECRET_KEY) {
-      await auth.protect();
-    }
-  }
-});
+const hasClerkKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+
+const handler = hasClerkKey
+  ? clerkMiddleware(async (auth, req) => {
+      try {
+        if (isProtectedRoute(req) && process.env.CLERK_SECRET_KEY) {
+          await auth.protect();
+        }
+      } catch {
+        return NextResponse.next();
+      }
+    })
+  : (req: NextRequest) => {
+      return NextResponse.next();
+    };
+
+export default handler;
 
 export const config = {
   matcher: [

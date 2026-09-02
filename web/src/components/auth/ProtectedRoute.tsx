@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,38 +11,24 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, loading: authLoading } = useAuth();
-  const currentUser = useQuery(api.users.getCurrentUser, {});
   const router = useRouter();
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     if (authLoading) return;
 
-    if (!user) {
-      router.push("/auth");
-      return;
+    if (!user && !hasRedirected.current) {
+      hasRedirected.current = true;
+      router.replace("/auth");
     }
-
-    if (allowedRoles && allowedRoles.length > 0 && currentUser) {
-      const role = currentUser.role;
-
-      if (!allowedRoles.includes(role)) {
-        if (role === "hospital") {
-          router.push("/hospital/dashboard");
-        } else if (role === "admin") {
-          router.push("/admin/dashboard");
-        } else {
-          router.push("/donor/dashboard");
-        }
-      }
-    }
-  }, [user, authLoading, currentUser, router, allowedRoles]);
+  }, [user, authLoading, router]);
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-black">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto"></div>
-          <p className="mt-2 text-sm text-muted-foreground">Loading session...</p>
+          <p className="mt-3 text-xs text-neutral-400 font-mono">Loading secure session...</p>
         </div>
       </div>
     );
@@ -56,4 +40,5 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
 
   return <>{children}</>;
 }
+
 export default ProtectedRoute;
