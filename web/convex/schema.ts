@@ -258,6 +258,16 @@ export default defineSchema({
       v.literal("FIRST_PERSON"),
       v.literal("SURROGATE")
     ),
+    purpose: v.optional(
+      v.union(
+        v.literal("DONATION"),
+        v.literal("EMERGENCY_CONTACT"),
+        v.literal("LOCATION_PROCESSING"),
+        v.literal("AI_PROCESSING"),
+        v.literal("COMMUNICATION"),
+        v.literal("RESEARCH")
+      )
+    ),
     status: v.union(
       v.literal("NO_CONSENT"),
       v.literal("PENDING"),
@@ -880,4 +890,39 @@ export default defineSchema({
     .index("by_decisionId", ["decisionId"])
     .index("by_proofId", ["proofId"])
     .index("by_isOverride", ["isOverride"]),
+
+  // ==========================================
+  // PRIVACY, SECURITY & GOVERNANCE (STEP 10)
+  // ==========================================
+
+  securityEvents: defineTable({
+    eventId: v.string(),
+    eventType: v.union(
+      v.literal("ACCESS_DENIED"),
+      v.literal("AUTH_FAILURE"),
+      v.literal("PRIVILEGE_ESCALATION_ATTEMPT"),
+      v.literal("RATE_LIMIT_EXCEEDED"),
+      v.literal("ACCOUNT_SUSPENDED"),
+      v.literal("ACCOUNT_RESTORED"),
+      v.literal("CONSENT_REVOKED"),
+      v.literal("ROLE_CHANGED")
+    ),
+    actorId: v.optional(v.string()),
+    actorRole: v.optional(v.string()),
+    resourceType: v.string(),
+    resourceId: v.optional(v.string()),
+    facilityId: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    reason: v.string(),
+    severity: v.union(
+      v.literal("LOW"),
+      v.literal("MEDIUM"),
+      v.literal("HIGH"),
+      v.literal("CRITICAL")
+    ),
+    timestamp: v.number(),
+  })
+    .index("by_eventType", ["eventType"])
+    .index("by_severity", ["severity"])
+    .index("by_timestamp", ["timestamp"]),
 });
