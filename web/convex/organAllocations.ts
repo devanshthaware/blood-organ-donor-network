@@ -1,12 +1,19 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { requireUser } from "./authHelpers";
+import { requireUser, requireRole } from "./authHelpers";
 import {
   ALLOCATION_STATUSES,
   VALID_ALLOCATION_TRANSITIONS,
   isValidTransition,
   AllocationStatus,
 } from "./domainConstants";
+
+export {
+  getRecommendationsForOrgan,
+  saveRecommendationsBatch,
+  approveAllocationWithRevalidation,
+  rejectAllocationWithReason,
+} from "./organAllocation/approvalWorkflow";
 
 export const getAllocations = query({
   args: { status: v.optional(v.string()) },

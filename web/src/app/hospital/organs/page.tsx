@@ -23,12 +23,15 @@ import {
     Sparkles,
     ArrowRight,
     Search,
+    Scale,
+    SlidersHorizontal,
 } from "lucide-react"
 
 export default function HospitalOrgansPage() {
     const [activeTab, setActiveTab] = useState("inventory")
     const [selectedOrganId, setSelectedOrganId] = useState<string | null>(null)
     const [isMatchingRunning, setIsMatchingRunning] = useState(false)
+    const [isOptimizingRunning, setIsOptimizingRunning] = useState(false)
 
     const inventory = useQuery((api as any).organInventory?.getAllOrganInventory, {}) || []
     const recipients = useQuery((api as any).recipients?.getAllRecipients, {}) || []
@@ -40,12 +43,21 @@ export default function HospitalOrgansPage() {
         selectedOrganId ? { organId: selectedOrganId } : "skip"
     ) || []
 
+    const activeRecommendations = useQuery(
+        (api as any).organAllocations?.getRecommendationsForOrgan,
+        selectedOrganId ? { organId: selectedOrganId } : "skip"
+    ) || []
+
     const runMatchingAction = useAction((api as any).organMatching?.actions?.runOrganMatching)
-    const submitAllocationReviewMutation = useMutation(
-        (api as any).organAllocations?.submitAllocationReview
+    const generateRecsAction = useAction(
+        (api as any).organAllocation?.approvalWorkflow?.generateAllocationRecommendations
     )
-    const approveAllocationMutation = useMutation((api as any).organAllocations?.approveAllocation)
-    const rejectAllocationMutation = useMutation((api as any).organAllocations?.rejectAllocation)
+    const approveWithRevalidationMutation = useMutation(
+        (api as any).organAllocations?.approveAllocationWithRevalidation
+    )
+    const rejectWithReasonMutation = useMutation(
+        (api as any).organAllocations?.rejectAllocationWithReason
+    )
 
     const handleRunMatching = async (organId: string) => {
         setSelectedOrganId(organId)
@@ -63,53 +75,79 @@ export default function HospitalOrgansPage() {
         }
     }
 
-    const handleSelectForAllocationReview = async (match: any) => {
-        const reason = prompt(
-            "Enter preliminary clinical reason to advance candidate to allocation review:",
-            "High priority matching candidate meeting clinical feasibility criteria."
-        )
-        if (!reason) return
-
+    const handleGenerateRecommendations = async (organId: string) => {
+        setSelectedOrganId(organId)
+        setIsOptimizingRunning(true)
         try {
-            await submitAllocationReviewMutation({
-                organId: match.organId,
-                recipientId: match.recipientId,
-                requestId: match.requestId,
-                matchId: match._id,
-                proposedReason: reason,
-            })
-            alert("Candidate advanced to Allocation Review. Organ placed in MATCHING review state.")
+            const result = await generateRecsAction({ organId })
+            if (result.recommendationsCount === 0) {
+                alert("No candidates passed the multi-objective allocation eligibility gate.")
+            } else {
+                alert(`Generated ${result.recommendationsCount} multi-objective allocation recommendations.`)
+            }
             setActiveTab("allocations")
         } catch (err: any) {
-            alert(err?.message || "Failed to submit for allocation review.")
+            alert(err?.message || "Failed to generate allocation recommendations.")
+        } finally {
+            setIsOptimizingRunning(false)
         }
     }
 
-    const handleApprove = async (allocationId: string) => {
-        const reason = prompt("Enter clinical justification for allocation approval:")
-        if (!reason) return
+    const handleApproveRecommendation = async (rec: any, isOverride: boolean) => {
+        let overrideReason: string | undefined = undefined
+
+        if (isOverride) {
+            const promptReason = prompt(
+                `HUMAN OVERRIDE REQUIRED:\nYou are selecting Rank #${rec.rank} instead of the primary Rank #1 recommendation.\nEnter mandatory clinical/logistical justification:`,
+                "Surgeon consensus based on immediate operating room readiness."
+            )
+            if (!promptReason || promptReason.trim().length === 0) {
+                alert("Approval aborted: Override justification is mandatory.")
+                return
+            }
+            overrideReason = promptReason
+        }
+
+        const justification = prompt(
+            "Enter clinical justification to execute authorized organ allocation:",
+            isOverride
+                ? `Approved under human coordinator override: ${overrideReason}`
+                : "Primary recommendation approved following clinical review."
+        )
+        if (!justification) return
+
         try {
-            await approveAllocationMutation({
-                allocationId: allocationId as any,
-                clinicalJustification: reason,
+            const result = await approveWithRevalidationMutation({
+                recommendationId: rec._id,
+                clinicalJustification: justification,
+                isOverride,
+                overrideReason,
             })
-            alert("Allocation approved successfully. Organ allocated.")
+            alert(`Allocation AUTHORIZED successfully!\nAudit Reference: ${result.auditReference}\nOrgan status updated to ALLOCATED.`)
         } catch (err: any) {
-            alert(err?.message || "Failed to approve allocation.")
+            alert(err?.message || "Failed to authorize allocation.")
         }
     }
 
-    const handleReject = async (allocationId: string) => {
-        const reason = prompt("Enter clinical reason for rejecting allocation:")
+    const handleRejectRecommendation = async (rec: any) => {
+        const category = prompt(
+            "Select Rejection Category:\n1. Clinical Review Concern\n2. Logistics Unfeasible\n3. Patient Unavailable\n4. Other",
+            "Clinical Review Concern"
+        )
+        if (!category) return
+
+        const reason = prompt("Enter specific clinical/operational reason for rejection:")
         if (!reason) return
+
         try {
-            await rejectAllocationMutation({
-                allocationId: allocationId as any,
+            await rejectWithReasonMutation({
+                recommendationId: rec._id,
+                rejectionCategory: category,
                 rejectionReason: reason,
             })
-            alert("Allocation rejected. Organ returned to available pool.")
+            alert("Recommendation rejected and recorded in audit trail.")
         } catch (err: any) {
-            alert(err?.message || "Failed to reject allocation.")
+            alert(err?.message || "Failed to reject recommendation.")
         }
     }
 
@@ -133,7 +171,7 @@ export default function HospitalOrgansPage() {
                     <h2 className="text-3xl font-bold tracking-tight">Organ Donor Network</h2>
                 </div>
                 <p className="text-muted-foreground mt-1">
-                    Multi-factor compatibility evaluation, candidate recommendation ranking, and authorized human governance.
+                    Multi-objective optimization, candidate recommendations, and authorized human governance.
                 </p>
             </div>
 
@@ -180,14 +218,14 @@ export default function HospitalOrgansPage() {
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
+                        <CardTitle className="text-sm font-medium">Authorized Allocations</CardTitle>
                         <ShieldCheck className="h-4 w-4 text-purple-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
-                            {allocations.filter((a: any) => a.decisionStatus === "PENDING_HUMAN_APPROVAL").length}
+                            {allocations.filter((a: any) => a.decisionStatus === "APPROVED").length}
                         </div>
-                        <p className="text-xs text-muted-foreground">Awaiting human coordinator review</p>
+                        <p className="text-xs text-muted-foreground">Formally approved by coordinators</p>
                     </CardContent>
                 </Card>
             </div>
@@ -203,6 +241,10 @@ export default function HospitalOrgansPage() {
                         <Sparkles className="h-4 w-4 text-amber-500" />
                         <span>Candidate Matches</span>
                     </TabsTrigger>
+                    <TabsTrigger value="allocations" className="flex items-center gap-1.5">
+                        <Scale className="h-4 w-4 text-purple-500" />
+                        <span>Allocation Review</span>
+                    </TabsTrigger>
                     <TabsTrigger value="recipients" className="flex items-center gap-1.5">
                         <Users className="h-4 w-4" />
                         <span>Recipients</span>
@@ -210,10 +252,6 @@ export default function HospitalOrgansPage() {
                     <TabsTrigger value="requests" className="flex items-center gap-1.5">
                         <GitPullRequest className="h-4 w-4" />
                         <span>Requests</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="allocations" className="flex items-center gap-1.5">
-                        <ShieldCheck className="h-4 w-4" />
-                        <span>Allocations</span>
                     </TabsTrigger>
                 </TabsList>
 
@@ -223,7 +261,7 @@ export default function HospitalOrgansPage() {
                         <CardHeader>
                             <CardTitle>Identified & Available Organs</CardTitle>
                             <CardDescription>
-                                Tracked organs with active preservation clocks. Run the matching engine to rank eligible recipient candidates.
+                                Tracked organs with active preservation clocks. Run matching or optimize multi-objective allocation recommendations.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -235,7 +273,7 @@ export default function HospitalOrgansPage() {
                                         <TableHead>Status</TableHead>
                                         <TableHead>Preservation Window</TableHead>
                                         <TableHead>Facility</TableHead>
-                                        <TableHead className="text-right">Action</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -273,15 +311,24 @@ export default function HospitalOrgansPage() {
                                                 <TableCell className="text-muted-foreground font-mono text-xs">
                                                     {organ.currentFacilityId.substring(0, 12)}...
                                                 </TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="text-right space-x-2">
                                                     {(organ.status === "AVAILABLE" || organ.status === "MATCHING") && (
-                                                        <Button
-                                                            size="sm"
-                                                            className="bg-red-600 hover:bg-red-700 text-white"
-                                                            onClick={() => handleRunMatching(organ._id)}
-                                                        >
-                                                            <Sparkles className="h-3.5 w-3.5 mr-1" /> Find Matches
-                                                        </Button>
+                                                        <>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => handleRunMatching(organ._id)}
+                                                            >
+                                                                <Sparkles className="h-3.5 w-3.5 mr-1 text-amber-500" /> Match
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                className="bg-purple-600 hover:bg-purple-700 text-white"
+                                                                onClick={() => handleGenerateRecommendations(organ._id)}
+                                                            >
+                                                                <Scale className="h-3.5 w-3.5 mr-1" /> Optimize Allocation
+                                                            </Button>
+                                                        </>
                                                     )}
                                                 </TableCell>
                                             </TableRow>
@@ -293,7 +340,7 @@ export default function HospitalOrgansPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 2: Candidate Matches (Step 4 Core UI) */}
+                {/* Tab 2: Candidate Matches */}
                 <TabsContent value="matches" className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -301,18 +348,27 @@ export default function HospitalOrgansPage() {
                                 <div>
                                     <CardTitle>Recommended Candidate Matches</CardTitle>
                                     <CardDescription>
-                                        Policy-constrained candidate ranking with deterministic explanations. (Recommendations only — does not allocate).
+                                        Policy-constrained candidate ranking with deterministic explanations.
                                     </CardDescription>
                                 </div>
                                 {selectedOrganId && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleRunMatching(selectedOrganId)}
-                                        disabled={isMatchingRunning}
-                                    >
-                                        {isMatchingRunning ? "Analyzing..." : "Re-evaluate Matching"}
-                                    </Button>
+                                    <div className="space-x-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleRunMatching(selectedOrganId)}
+                                            disabled={isMatchingRunning}
+                                        >
+                                            {isMatchingRunning ? "Analyzing..." : "Re-evaluate Matching"}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            className="bg-purple-600 hover:bg-purple-700 text-white"
+                                            onClick={() => handleGenerateRecommendations(selectedOrganId)}
+                                        >
+                                            <Scale className="h-3.5 w-3.5 mr-1" /> Optimize Allocation
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
                         </CardHeader>
@@ -320,19 +376,12 @@ export default function HospitalOrgansPage() {
                             {!selectedOrganId ? (
                                 <div className="text-center py-12 text-muted-foreground">
                                     <Search className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                    <p>Select an available organ from the <strong>Inventory</strong> tab to evaluate and rank candidate matches.</p>
-                                </div>
-                            ) : isMatchingRunning ? (
-                                <div className="text-center py-12 text-muted-foreground animate-pulse">
-                                    Evaluating hard constraints, calculating multi-factor scores, and consulting ML layer...
+                                    <p>Select an available organ from the <strong>Inventory</strong> tab to evaluate candidate matches.</p>
                                 </div>
                             ) : selectedMatches.length === 0 ? (
                                 <div className="text-center py-12 text-muted-foreground">
                                     <AlertTriangle className="h-10 w-10 mx-auto text-amber-500/50 mb-3" />
                                     <p className="font-medium text-foreground">No eligible candidates passed hard constraints.</p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Check organ type requisitions, active request statuses, and clinical verification states.
-                                    </p>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
@@ -346,55 +395,16 @@ export default function HospitalOrgansPage() {
                                                                 Rank #{match.ranking}
                                                             </Badge>
                                                             <span className="font-semibold text-base">
-                                                                Candidate Recipient: {match.recipientId.substring(0, 10)}...
+                                                                Recipient: {match.recipientId.substring(0, 10)}...
                                                             </span>
                                                             <Badge variant="outline">
                                                                 Score: {Math.round(match.score * 100)}%
-                                                            </Badge>
-                                                            <Badge variant="secondary" className="text-xs">
-                                                                {match.dataConfidence || "HIGH"} Confidence
                                                             </Badge>
                                                         </div>
                                                         <p className="text-sm text-foreground/90 font-medium mt-1">
                                                             {match.explanation}
                                                         </p>
                                                     </div>
-
-                                                    <Button
-                                                        size="sm"
-                                                        className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"
-                                                        onClick={() => handleSelectForAllocationReview(match)}
-                                                    >
-                                                        Advance to Review <ArrowRight className="h-4 w-4 ml-1" />
-                                                    </Button>
-                                                </div>
-
-                                                {/* Factors & Warnings */}
-                                                <div className="mt-4 grid md:grid-cols-2 gap-3 pt-3 border-t text-xs">
-                                                    <div>
-                                                        <span className="font-semibold text-muted-foreground block mb-1">
-                                                            Evaluation Factors:
-                                                        </span>
-                                                        <ul className="space-y-0.5 text-muted-foreground">
-                                                            <li>• Distance: {Math.round(match.compatibilitySummary.distanceKm)} km</li>
-                                                            <li>• Blood Match: {match.compatibilitySummary.bloodCompatibility ? "Compatible" : "Incompatible"}</li>
-                                                            <li>• Policy: {match.policyVersion || "2026.1-NATIONAL-POLICY"}</li>
-                                                            <li>• Algorithm: {match.algorithmVersion || "1.0.0-DETERMINISTIC"}</li>
-                                                        </ul>
-                                                    </div>
-
-                                                    {match.warnings && match.warnings.length > 0 && (
-                                                        <div>
-                                                            <span className="font-semibold text-amber-500 block mb-1">
-                                                                Clinical & Logistical Warnings:
-                                                            </span>
-                                                            <ul className="space-y-0.5 text-amber-500/90">
-                                                                {match.warnings.map((w: string, i: number) => (
-                                                                    <li key={i}>{w}</li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -405,14 +415,243 @@ export default function HospitalOrgansPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 3: Recipients */}
+                {/* Tab 3: Allocations Review & Governance (Step 5 Core UI) */}
+                <TabsContent value="allocations" className="space-y-4">
+                    {/* Active Recommendations Multi-Candidate Comparison */}
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle>Multi-Objective Allocation Recommendations</CardTitle>
+                                    <CardDescription>
+                                        Candidate comparison across clinical urgency, waitlist equity, logistical transit, and cold ischemia viability.
+                                    </CardDescription>
+                                </div>
+                                {selectedOrganId && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleGenerateRecommendations(selectedOrganId)}
+                                        disabled={isOptimizingRunning}
+                                    >
+                                        {isOptimizingRunning ? "Optimizing..." : "Refresh Recommendations"}
+                                    </Button>
+                                )}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {!selectedOrganId ? (
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <Scale className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p>Select an organ from <strong>Inventory</strong> to inspect multi-candidate allocation recommendations.</p>
+                                </div>
+                            ) : activeRecommendations.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <SlidersHorizontal className="h-10 w-10 mx-auto text-purple-500/50 mb-3" />
+                                    <p className="font-medium text-foreground">No active recommendations generated for this organ.</p>
+                                    <Button
+                                        size="sm"
+                                        className="mt-3 bg-purple-600 hover:bg-purple-700 text-white"
+                                        onClick={() => handleGenerateRecommendations(selectedOrganId)}
+                                    >
+                                        Generate Multi-Objective Recommendations
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {/* Multi-Candidate Comparison Table */}
+                                    <div className="rounded-md border">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Rank</TableHead>
+                                                    <TableHead>Candidate</TableHead>
+                                                    <TableHead>Urgency</TableHead>
+                                                    <TableHead>Waitlist Days</TableHead>
+                                                    <TableHead>Distance</TableHead>
+                                                    <TableHead>Preservation</TableHead>
+                                                    <TableHead>Score</TableHead>
+                                                    <TableHead className="text-right">Coordinator Decision</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {activeRecommendations.map((rec: any) => {
+                                                    const isRank1 = rec.rank === 1
+                                                    return (
+                                                        <TableRow key={rec._id} className={isRank1 ? "bg-muted/30" : ""}>
+                                                            <TableCell>
+                                                                <Badge variant={isRank1 ? "default" : "secondary"}>
+                                                                    Rank #{rec.rank}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="font-mono text-xs">
+                                                                {rec.recipientId.substring(0, 10)}...
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Badge
+                                                                    variant={
+                                                                        rec.objectives?.urgencyTier === "CRITICAL"
+                                                                            ? "destructive"
+                                                                            : "outline"
+                                                                    }
+                                                                >
+                                                                    {rec.objectives?.urgencyTier || "N/A"}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-sm">
+                                                                {rec.objectives?.waitlistDays ?? 0} days
+                                                            </TableCell>
+                                                            <TableCell className="text-sm">
+                                                                {rec.objectives?.distanceKm ?? 0} km
+                                                            </TableCell>
+                                                            <TableCell className="text-sm font-mono">
+                                                                {rec.objectives?.preservationRemainingHours ?? 0}h
+                                                            </TableCell>
+                                                            <TableCell className="font-bold text-sm">
+                                                                {Math.round(rec.score * 100)}%
+                                                            </TableCell>
+                                                            <TableCell className="text-right space-x-2">
+                                                                {rec.status === "PENDING_REVIEW" ? (
+                                                                    <>
+                                                                        {isRank1 ? (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                className="bg-green-600 hover:bg-green-700 text-white"
+                                                                                onClick={() => handleApproveRecommendation(rec, false)}
+                                                                            >
+                                                                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Approve Rank #1
+                                                                            </Button>
+                                                                        ) : (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="text-amber-500 border-amber-500 hover:bg-amber-500/10"
+                                                                                onClick={() => handleApproveRecommendation(rec, true)}
+                                                                            >
+                                                                                <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Override & Approve
+                                                                            </Button>
+                                                                        )}
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            className="text-red-500 border-red-500 hover:bg-red-500/10"
+                                                                            onClick={() => handleRejectRecommendation(rec)}
+                                                                        >
+                                                                            <XCircle className="h-3.5 w-3.5" />
+                                                                        </Button>
+                                                                    </>
+                                                                ) : (
+                                                                    <Badge variant="outline">{rec.status}</Badge>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )
+                                                })}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+
+                                    {/* Recommendation Explanations */}
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        {activeRecommendations.map((rec: any) => (
+                                            <Card key={rec._id} className="text-xs">
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="text-sm flex items-center justify-between">
+                                                        <span>Recommendation Profile: Rank #{rec.rank}</span>
+                                                        <Badge variant="outline">{rec.policyVersion}</Badge>
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="space-y-2">
+                                                    <p className="font-medium text-foreground">{rec.explanation}</p>
+                                                    <div className="pt-2 border-t space-y-1 text-muted-foreground">
+                                                        <div>• Urgency Contribution: +{rec.objectiveBreakdown?.urgencyContribution}</div>
+                                                        <div>• Waitlist Contribution: +{rec.objectiveBreakdown?.waitlistContribution}</div>
+                                                        <div>• Logistics Contribution: +{rec.objectiveBreakdown?.logisticsContribution}</div>
+                                                        <div>• Preservation Contribution: +{rec.objectiveBreakdown?.preservationContribution}</div>
+                                                    </div>
+                                                    {rec.warnings && rec.warnings.length > 0 && (
+                                                        <div className="pt-2 border-t text-amber-500 space-y-0.5">
+                                                            {rec.warnings.map((w: string, i: number) => (
+                                                                <div key={i}>⚠ {w}</div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </CardContent>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Authorized Allocation Records (History) */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Authorized Allocation Records</CardTitle>
+                            <CardDescription>
+                                Immutable history of coordinator-authorized organ allocations.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Audit Reference</TableHead>
+                                        <TableHead>Organ ID</TableHead>
+                                        <TableHead>Recipient ID</TableHead>
+                                        <TableHead>Decision</TableHead>
+                                        <TableHead>Coordinator Justification</TableHead>
+                                        <TableHead>Approved At</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {allocations.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                                                No formal allocations authorized yet.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        allocations.map((alloc: any) => (
+                                            <TableRow key={alloc._id}>
+                                                <TableCell className="font-mono text-xs font-semibold">
+                                                    {alloc.auditReference}
+                                                </TableCell>
+                                                <TableCell className="font-mono text-xs">{alloc.organId.substring(0, 8)}...</TableCell>
+                                                <TableCell className="font-mono text-xs">{alloc.recipientId.substring(0, 8)}...</TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant={
+                                                            alloc.decisionStatus === "APPROVED"
+                                                                ? "default"
+                                                                : "destructive"
+                                                        }
+                                                    >
+                                                        {alloc.isOverride ? "OVERRIDE APPROVED" : alloc.decisionStatus}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-xs max-w-xs truncate">
+                                                    {alloc.decisionReason}
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    {alloc.approvedAt ? new Date(alloc.approvedAt).toLocaleString() : "N/A"}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Tab 4: Recipients */}
                 <TabsContent value="recipients" className="space-y-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>Transplant Waitlist Candidates</CardTitle>
-                            <CardDescription>
-                                Verified recipients waiting for compatible organ matches.
-                            </CardDescription>
+                            <CardDescription>Verified recipients waiting for compatible organ matches.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Table>
@@ -465,14 +704,12 @@ export default function HospitalOrgansPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 4: Organ Requests */}
+                {/* Tab 5: Organ Requests */}
                 <TabsContent value="requests" className="space-y-4">
                     <Card>
                         <CardHeader>
                             <CardTitle>Transplant Center Requests</CardTitle>
-                            <CardDescription>
-                                Clinical organ requests initiated by accredited transplant centers.
-                            </CardDescription>
+                            <CardDescription>Clinical organ requests initiated by accredited transplant centers.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Table>
@@ -509,88 +746,6 @@ export default function HospitalOrgansPage() {
                                                 </TableCell>
                                                 <TableCell className="text-xs text-muted-foreground">
                                                     {new Date(req.createdAt).toLocaleDateString()}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                {/* Tab 5: Allocations */}
-                <TabsContent value="allocations" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Human Governance & Allocation Approvals</CardTitle>
-                            <CardDescription>
-                                Formal decisions assigning organs to recipients. Requires authorized human coordinator justification.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Organ ID</TableHead>
-                                        <TableHead>Recipient ID</TableHead>
-                                        <TableHead>Decision Status</TableHead>
-                                        <TableHead>Audit Reference</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {allocations.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                                                No allocation reviews pending.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        allocations.map((alloc: any) => (
-                                            <TableRow key={alloc._id}>
-                                                <TableCell className="font-mono text-xs">{alloc.organId}</TableCell>
-                                                <TableCell className="font-mono text-xs">{alloc.recipientId}</TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant={
-                                                            alloc.decisionStatus === "APPROVED"
-                                                                ? "default"
-                                                                : alloc.decisionStatus === "REJECTED"
-                                                                ? "destructive"
-                                                                : "secondary"
-                                                        }
-                                                    >
-                                                        {alloc.decisionStatus}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="font-mono text-xs text-muted-foreground">
-                                                    {alloc.auditReference}
-                                                </TableCell>
-                                                <TableCell className="text-right space-x-2">
-                                                    {alloc.decisionStatus === "PENDING_HUMAN_APPROVAL" ? (
-                                                        <>
-                                                            <Button
-                                                                size="sm"
-                                                                className="bg-green-600 hover:bg-green-700 text-white"
-                                                                onClick={() => handleApprove(alloc._id)}
-                                                            >
-                                                                <CheckCircle2 className="h-4 w-4 mr-1" /> Approve
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="text-red-500 border-red-500 hover:bg-red-500/10"
-                                                                onClick={() => handleReject(alloc._id)}
-                                                            >
-                                                                <XCircle className="h-4 w-4 mr-1" /> Reject
-                                                            </Button>
-                                                        </>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground italic">
-                                                            {alloc.decisionReason}
-                                                        </span>
-                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))

@@ -412,11 +412,47 @@ export default defineSchema({
     .index("by_recipientId", ["recipientId"])
     .index("by_status", ["status"]),
 
+  allocationRecommendations: defineTable({
+    organId: v.string(),
+    requestId: v.string(),
+    recipientId: v.string(),
+    candidateMatchId: v.string(),
+    score: v.number(),
+    rank: v.number(),
+    objectives: v.any(),
+    objectiveBreakdown: v.any(),
+    constraints: v.array(v.string()),
+    constraintResults: v.any(),
+    warnings: v.array(v.string()),
+    policyVersion: v.string(),
+    algorithmVersion: v.string(),
+    modelVersion: v.optional(v.string()),
+    explanation: v.string(),
+    status: v.union(
+      v.literal("GENERATED"),
+      v.literal("PENDING_REVIEW"),
+      v.literal("UNDER_REVIEW"),
+      v.literal("APPROVED"),
+      v.literal("REJECTED"),
+      v.literal("SUPERSEDED"),
+      v.literal("EXPIRED")
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organId", ["organId"])
+    .index("by_requestId", ["requestId"])
+    .index("by_recipientId", ["recipientId"])
+    .index("by_status", ["status"]),
+
   organAllocations: defineTable({
     organId: v.string(),
     recipientId: v.string(),
     requestId: v.string(),
     matchId: v.string(),
+    recommendationId: v.optional(v.string()),
+    isOverride: v.optional(v.boolean()),
+    overrideReason: v.optional(v.string()),
     decisionStatus: v.union(
       v.literal("PENDING_HUMAN_APPROVAL"),
       v.literal("APPROVED"),
@@ -429,6 +465,7 @@ export default defineSchema({
     decisionMakerRole: v.string(),
     approvedAt: v.optional(v.number()),
     policyVersion: v.string(),
+    algorithmVersion: v.optional(v.string()),
     auditReference: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
