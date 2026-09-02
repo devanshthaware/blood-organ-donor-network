@@ -796,4 +796,88 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_severity", ["severity"])
     .index("by_createdAt", ["createdAt"]),
+
+  // ==========================================
+  // BLOCKCHAIN TRUST & PROVENANCE LAYER (STEP 9)
+  // ==========================================
+
+  auditProofs: defineTable({
+    proofId: v.string(),
+    auditId: v.string(),
+    eventId: v.string(),
+    eventType: v.string(),
+    aggregateType: v.string(),
+    aggregateId: v.string(),
+    actorType: v.string(),
+    actorId: v.optional(v.string()),
+    occurredAt: v.number(),
+    action: v.string(),
+    result: v.string(),
+    dataHash: v.string(),
+    previousAuditHash: v.optional(v.string()),
+    chainHash: v.string(),
+    trustLevel: v.union(
+      v.literal("STANDARD"),
+      v.literal("IMPORTANT"),
+      v.literal("CRITICAL")
+    ),
+    blockchainStatus: v.union(
+      v.literal("PENDING"),
+      v.literal("SUBMITTING"),
+      v.literal("CONFIRMED"),
+      v.literal("FAILED"),
+      v.literal("RETRYING")
+    ),
+    blockchainTxId: v.optional(v.string()),
+    blockchainBlock: v.optional(v.number()),
+    blockchainNetwork: v.optional(v.string()),
+    merkleBatchId: v.optional(v.string()),
+    merkleRoot: v.optional(v.string()),
+    anchoredAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_eventId", ["eventId"])
+    .index("by_dataHash", ["dataHash"])
+    .index("by_chainHash", ["chainHash"])
+    .index("by_blockchainStatus", ["blockchainStatus"])
+    .index("by_trustLevel", ["trustLevel"]),
+
+  merkleBatches: defineTable({
+    batchId: v.string(),
+    rootHash: v.string(),
+    eventCount: v.number(),
+    proofIds: v.array(v.string()),
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("SUBMITTING"),
+      v.literal("CONFIRMED"),
+      v.literal("FAILED")
+    ),
+    blockchainTxId: v.optional(v.string()),
+    blockchainNetwork: v.string(),
+    anchoredAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_rootHash", ["rootHash"]),
+
+  aiDecisionProvenance: defineTable({
+    provenanceId: v.string(),
+    decisionId: v.string(),
+    modelType: v.string(),
+    modelVersion: v.string(),
+    inputHash: v.string(),
+    outputHash: v.string(),
+    confidence: v.number(),
+    explanationHash: v.string(),
+    recommendation: v.string(),
+    humanDecision: v.optional(v.string()),
+    isOverride: v.boolean(),
+    overrideReason: v.optional(v.string()),
+    proofId: v.string(),
+    timestamp: v.number(),
+  })
+    .index("by_decisionId", ["decisionId"])
+    .index("by_proofId", ["proofId"])
+    .index("by_isOverride", ["isOverride"]),
 });

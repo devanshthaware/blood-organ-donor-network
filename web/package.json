@@ -13,7 +13,8 @@
     "test:organ-allocation": "tsx scripts/test-organ-allocation.ts",
     "test:organ-logistics": "tsx scripts/test-organ-logistics.ts",
     "test:cv-verification": "tsx scripts/test-cv-verification.ts",
-    "test:n8n-automation": "tsx scripts/test-n8n-automation.ts"
+    "test:n8n-automation": "tsx scripts/test-n8n-automation.ts",
+    "test:blockchain-trust": "tsx scripts/test-blockchain-trust.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.8.4",
