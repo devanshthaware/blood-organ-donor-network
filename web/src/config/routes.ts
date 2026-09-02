@@ -42,6 +42,7 @@ export const routes = {
     ],
     admin: [
         { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+        { name: "Blockchain Ledger", href: "/admin/blockchain", icon: Link2 },
         { name: "Hospitals", href: "/admin/hospitals", icon: Building2 },
         { name: "Donors", href: "/admin/donors", icon: Users },
         { name: "AI Monitor", href: "/admin/ai-monitor", icon: Activity },
