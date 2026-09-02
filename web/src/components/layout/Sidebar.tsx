@@ -7,7 +7,7 @@ import { useClerk } from "@clerk/nextjs"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, LayoutDashboard, List, History, Calendar, Users, Bell, Shield, Activity, FileText, LogOut, User, Building2, MapPinned, Stethoscope } from "lucide-react"
+import { Menu, LayoutDashboard, List, History, Calendar, Users, Bell, Shield, Activity, FileText, LogOut, User, Building2, MapPinned, Stethoscope, HeartHandshake } from "lucide-react"
 
 const routes = {
     donor: [
@@ -20,6 +20,7 @@ const routes = {
     ],
     hospital: [
         { name: "Dashboard", href: "/hospital/dashboard", icon: LayoutDashboard },
+        { name: "Organ Network", href: "/hospital/organs", icon: HeartHandshake },
         { name: "Checkups", href: "/hospital/checkups", icon: Stethoscope },
         { name: "Patients", href: "/hospital/patients", icon: Users },
         { name: "Requests", href: "/hospital/requests", icon: List },

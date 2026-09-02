@@ -1,4 +1,4 @@
-import { LayoutDashboard, List, History, Calendar, Users, Bell, Shield, Activity, User, Building2, Stethoscope } from "lucide-react"
+import { LayoutDashboard, List, History, Calendar, Users, Bell, Shield, Activity, User, Building2, Stethoscope, HeartHandshake } from "lucide-react"
 
 export const routes = {
     donor: [
@@ -10,6 +10,7 @@ export const routes = {
     ],
     hospital: [
         { name: "Dashboard", href: "/hospital/dashboard", icon: LayoutDashboard },
+        { name: "Organ Network", href: "/hospital/organs", icon: HeartHandshake },
         { name: "Checkups", href: "/hospital/checkups", icon: Stethoscope },
         { name: "Patients", href: "/hospital/patients", icon: Users },
         { name: "Requests", href: "/hospital/requests", icon: List },

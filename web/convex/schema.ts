@@ -215,4 +215,237 @@ export default defineSchema({
   })
     .index("by_modelType", ["modelType"])
     .index("by_requestId", ["requestId"]),
+
+  // ==========================================
+  // ORGAN DOMAIN ENTITIES (STEP 3 FOUNDATION)
+  // ==========================================
+
+  organDonors: defineTable({
+    userId: v.string(),
+    donorStatus: v.union(
+      v.literal("REGISTERED"),
+      v.literal("PENDING_VERIFICATION"),
+      v.literal("VERIFIED"),
+      v.literal("ACTIVE"),
+      v.literal("INACTIVE"),
+      v.literal("SUSPENDED")
+    ),
+    donationPreferences: v.array(v.string()), // Controlled organ types
+    verificationStatus: v.union(
+      v.literal("UNVERIFIED"),
+      v.literal("PENDING"),
+      v.literal("VERIFIED"),
+      v.literal("REJECTED")
+    ),
+    bloodType: v.optional(v.string()),
+    location: v.object({
+      lat: v.number(),
+      lng: v.number(),
+      address: v.optional(v.string()),
+    }),
+    registeredAt: v.number(),
+    updatedAt: v.number(),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_status", ["donorStatus"]),
+
+  consentRecords: defineTable({
+    donorId: v.string(), // ID of organDonors or userId
+    consentType: v.union(
+      v.literal("OPT_IN"),
+      v.literal("ORGAN_SPECIFIC"),
+      v.literal("FIRST_PERSON"),
+      v.literal("SURROGATE")
+    ),
+    status: v.union(
+      v.literal("NO_CONSENT"),
+      v.literal("PENDING"),
+      v.literal("GRANTED"),
+      v.literal("WITHDRAWN"),
+      v.literal("EXPIRED_OR_INVALID")
+    ),
+    witnessName: v.optional(v.string()),
+    recordedAt: v.number(),
+    updatedAt: v.number(),
+    source: v.string(),
+    version: v.string(),
+    withdrawnAt: v.optional(v.number()),
+    notes: v.optional(v.string()),
+  })
+    .index("by_donorId", ["donorId"])
+    .index("by_status", ["status"]),
+
+  recipients: defineTable({
+    userId: v.string(),
+    recipientStatus: v.union(
+      v.literal("REGISTERED"),
+      v.literal("PENDING_VERIFICATION"),
+      v.literal("ACTIVE"),
+      v.literal("MATCHED"),
+      v.literal("ALLOCATED"),
+      v.literal("COMPLETED"),
+      v.literal("INACTIVE"),
+      v.literal("WITHDRAWN"),
+      v.literal("SUSPENDED")
+    ),
+    requiredOrganType: v.string(),
+    bloodType: v.string(),
+    urgency: v.union(v.literal("LOW"), v.literal("MEDIUM"), v.literal("HIGH"), v.literal("CRITICAL")),
+    verificationStatus: v.union(
+      v.literal("UNVERIFIED"),
+      v.literal("PENDING"),
+      v.literal("VERIFIED"),
+      v.literal("REJECTED")
+    ),
+    hospitalId: v.string(),
+    transplantCenterId: v.optional(v.string()),
+    location: v.object({
+      lat: v.number(),
+      lng: v.number(),
+      address: v.optional(v.string()),
+    }),
+    registeredAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_status", ["recipientStatus"])
+    .index("by_organType", ["requiredOrganType"])
+    .index("by_hospitalId", ["hospitalId"]),
+
+  organInventory: defineTable({
+    organType: v.string(),
+    bloodType: v.string(),
+    status: v.union(
+      v.literal("IDENTIFIED"),
+      v.literal("VERIFICATION_PENDING"),
+      v.literal("VERIFIED"),
+      v.literal("AVAILABLE"),
+      v.literal("MATCHING"),
+      v.literal("ALLOCATED"),
+      v.literal("IN_TRANSIT"),
+      v.literal("RECEIVED"),
+      v.literal("TRANSPLANTED"),
+      v.literal("EXPIRED"),
+      v.literal("REJECTED"),
+      v.literal("WITHDRAWN"),
+      v.literal("CANCELLED")
+    ),
+    donorId: v.optional(v.string()),
+    currentFacilityId: v.string(),
+    availabilityTimestamp: v.number(),
+    preservationDeadline: v.number(), // Epoch ms
+    verificationStatus: v.union(
+      v.literal("UNVERIFIED"),
+      v.literal("PENDING"),
+      v.literal("VERIFIED"),
+      v.literal("REJECTED")
+    ),
+    viabilityNotes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_organType", ["organType"])
+    .index("by_currentFacilityId", ["currentFacilityId"]),
+
+  organRequests: defineTable({
+    requestingOrganizationId: v.string(),
+    recipientId: v.string(),
+    organType: v.string(),
+    bloodType: v.string(),
+    urgency: v.union(v.literal("LOW"), v.literal("MEDIUM"), v.literal("HIGH"), v.literal("CRITICAL")),
+    status: v.union(
+      v.literal("CREATED"),
+      v.literal("VERIFICATION_PENDING"),
+      v.literal("ACTIVE"),
+      v.literal("MATCHING"),
+      v.literal("MATCH_FOUND"),
+      v.literal("ALLOCATION_PENDING"),
+      v.literal("ALLOCATED"),
+      v.literal("CANCELLED"),
+      v.literal("EXPIRED"),
+      v.literal("REJECTED"),
+      v.literal("COMPLETED")
+    ),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_organType", ["organType"])
+    .index("by_recipientId", ["recipientId"])
+    .index("by_orgId", ["requestingOrganizationId"]),
+
+  organMatches: defineTable({
+    organId: v.string(),
+    recipientId: v.string(),
+    requestId: v.string(),
+    compatibilitySummary: v.object({
+      bloodCompatibility: v.boolean(),
+      distanceKm: v.number(),
+      waitingTimeScore: v.optional(v.number()),
+    }),
+    score: v.number(),
+    ranking: v.number(),
+    constraints: v.array(v.string()),
+    explanation: v.string(),
+    modelVersion: v.string(),
+    status: v.union(
+      v.literal("PROPOSED"),
+      v.literal("REVIEWING"),
+      v.literal("ACCEPTED_FOR_ALLOCATION"),
+      v.literal("REJECTED_BY_COORDINATOR"),
+      v.literal("SUPERSEDED"),
+      v.literal("EXPIRED")
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organId", ["organId"])
+    .index("by_requestId", ["requestId"])
+    .index("by_recipientId", ["recipientId"])
+    .index("by_status", ["status"]),
+
+  organAllocations: defineTable({
+    organId: v.string(),
+    recipientId: v.string(),
+    requestId: v.string(),
+    matchId: v.string(),
+    decisionStatus: v.union(
+      v.literal("PENDING_HUMAN_APPROVAL"),
+      v.literal("APPROVED"),
+      v.literal("REJECTED"),
+      v.literal("CANCELLED"),
+      v.literal("EXECUTED")
+    ),
+    decisionReason: v.string(),
+    decisionMakerId: v.string(),
+    decisionMakerRole: v.string(),
+    approvedAt: v.optional(v.number()),
+    policyVersion: v.string(),
+    auditReference: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organId", ["organId"])
+    .index("by_recipientId", ["recipientId"])
+    .index("by_requestId", ["requestId"])
+    .index("by_decisionStatus", ["decisionStatus"]),
+
+  transplantCenters: defineTable({
+    name: v.string(),
+    hospitalId: v.string(),
+    address: v.string(),
+    region: v.number(),
+    lat: v.number(),
+    lng: v.number(),
+    accreditationCode: v.string(),
+    supportedOrgans: v.array(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_hospitalId", ["hospitalId"])
+    .index("by_region", ["region"])
+    .index("by_active", ["isActive"]),
 });

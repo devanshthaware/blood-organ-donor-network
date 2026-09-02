@@ -16,18 +16,24 @@ export async function requireUser(ctx: QueryCtx | MutationCtx) {
     .withIndex("by_clerkId", (q) => q.eq("clerkId", identity.subject))
     .first();
 
-  return { identity, user };
+  return {
+    clerkId: identity.subject,
+    email: identity.email || user?.email || "user@veinlink.org",
+    role: user?.role || "donor",
+    identity,
+    user,
+  };
 }
 
 export async function requireRole(
   ctx: QueryCtx | MutationCtx,
   allowedRoles: ("donor" | "hospital" | "admin")[]
 ) {
-  const { identity, user } = await requireUser(ctx);
-  if (!user || !allowedRoles.includes(user.role)) {
+  const result = await requireUser(ctx);
+  if (!result.user || !allowedRoles.includes(result.user.role)) {
     throw new Error(
-      `Unauthorized: Caller role (${user?.role || "unknown"}) is not permitted for this operation.`
+      `Unauthorized: Caller role (${result.user?.role || "unknown"}) is not permitted for this operation.`
     );
   }
-  return { identity, user };
+  return result;
 }
