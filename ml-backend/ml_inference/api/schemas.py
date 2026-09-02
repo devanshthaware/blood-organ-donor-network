@@ -180,3 +180,97 @@ class LabelVerificationResponse(BaseModel):
     explanation: str
 
 
+# ==========================================
+# ADVANCED AI & INTELLIGENCE SCHEMAS (STEP 11)
+# ==========================================
+
+class MultiHorizonForecastRequest(BaseModel):
+    region_id: str
+    blood_group: str
+    current_inventory: int = Field(..., ge=0)
+    recent_hourly_depletions: list[float] = Field(default_factory=list)
+    historical_daily_average_demand: float = Field(default=20.0)
+    historical_daily_average_supply: float = Field(default=16.0)
+    is_emergency_hotspot: bool = False
+
+
+class ForecastHorizonItem(BaseModel):
+    horizon_hours: int
+    shortage_probability: float
+    expected_demand: float
+    expected_supply: float
+    net_projected_stock: float
+    confidence: float
+    lower_bound: float
+    upper_bound: float
+
+
+class MultiHorizonForecastResponse(BaseModel):
+    region_id: str
+    blood_group: str
+    depletion_velocity: float
+    horizons: list[ForecastHorizonItem]
+    model_version: str = "2.1.0-demand-forecast"
+
+
+class DynamicAvailabilityRequest(BaseModel):
+    donor_id: str
+    distance_km: float = Field(..., ge=0.0)
+    urgency_level: str = "URGENT"
+    historical_acceptance_rate: float = Field(default=0.85, ge=0.0, le=1.0)
+    avg_response_minutes: float = Field(default=15.0, ge=1.0)
+    time_of_day_hours: int = Field(default=14, ge=0, le=23)
+
+
+class DynamicAvailabilityResponse(BaseModel):
+    donor_id: str
+    p_acceptance_within_15min: float
+    p_acceptance_within_30min: float
+    p_acceptance_within_60min: float
+    expected_response_minutes: int
+    expected_transit_minutes: int
+    total_arrival_minutes: int
+    confidence: float
+    model_version: str = "2.0.0-dynamic-availability"
+
+
+class ReliabilityVectorRequest(BaseModel):
+    donor_id: str
+    total_requests: int = Field(..., ge=0)
+    accepted_requests: int = Field(..., ge=0)
+    completed_donations: int = Field(..., ge=0)
+    no_shows: int = Field(..., ge=0)
+    avg_response_minutes: float = Field(default=20.0, ge=1.0)
+
+
+class ReliabilityVectorResponse(BaseModel):
+    donor_id: str
+    acceptance_score: float
+    attendance_score: float
+    response_score: float
+    completion_score: float
+    overall_reliability: float
+    factor_contributions: dict
+    model_version: str = "2.0.0-reliability-vector"
+
+
+class WhatIfSimulationRequest(BaseModel):
+    scenario_type: str
+    current_stock: int
+    expected_daily_demand: float
+    active_donors_count: int
+    parameters: dict = Field(default_factory=dict)
+
+
+class WhatIfSimulationResponse(BaseModel):
+    simulation_id: str
+    scenario_type: str
+    baseline_shortage_hours: float
+    projected_shortage_hours: float
+    net_units_impact: int
+    projected_fulfillment_rate: float
+    resilience_score_delta: int
+    recommendation_verdict: str
+
+
+

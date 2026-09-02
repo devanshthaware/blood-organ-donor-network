@@ -925,4 +925,116 @@ export default defineSchema({
     .index("by_eventType", ["eventType"])
     .index("by_severity", ["severity"])
     .index("by_timestamp", ["timestamp"]),
+
+  // ==========================================
+  // ADVANCED AI & NETWORK INTELLIGENCE (STEP 11)
+  // ==========================================
+
+  modelRegistry: defineTable({
+    modelId: v.string(),
+    modelType: v.string(),
+    version: v.string(),
+    status: v.union(
+      v.literal("TRAINING"),
+      v.literal("VALIDATED"),
+      v.literal("ACTIVE"),
+      v.literal("DEPRECATED")
+    ),
+    metrics: v.any(),
+    createdAt: v.number(),
+  })
+    .index("by_modelType", ["modelType"])
+    .index("by_status", ["status"]),
+
+  demandForecasts: defineTable({
+    forecastId: v.string(),
+    regionId: v.string(),
+    bloodGroup: v.string(),
+    horizonHours: v.number(),
+    shortageProbability: v.number(),
+    expectedDemand: v.number(),
+    expectedSupply: v.number(),
+    confidence: v.number(),
+    predictionInterval: v.object({
+      lower: v.number(),
+      upper: v.number(),
+    }),
+    depletionVelocity: v.number(),
+    modelVersion: v.string(),
+    generatedAt: v.number(),
+  })
+    .index("by_regionId", ["regionId"])
+    .index("by_bloodGroup", ["bloodGroup"])
+    .index("by_generatedAt", ["generatedAt"]),
+
+  networkAnomalies: defineTable({
+    anomalyId: v.string(),
+    anomalyType: v.union(
+      v.literal("DEMAND_SURGE"),
+      v.literal("RAPID_DEPLETION"),
+      v.literal("RESPONSE_DROP"),
+      v.literal("LOGISTICS_BOTTLENECK")
+    ),
+    severity: v.union(
+      v.literal("LOW"),
+      v.literal("MEDIUM"),
+      v.literal("HIGH"),
+      v.literal("CRITICAL")
+    ),
+    score: v.number(),
+    affectedEntity: v.string(),
+    regionId: v.string(),
+    explanation: v.string(),
+    status: v.union(
+      v.literal("ACTIVE"),
+      v.literal("ACKNOWLEDGED"),
+      v.literal("RESOLVED")
+    ),
+    detectedAt: v.number(),
+  })
+    .index("by_anomalyType", ["anomalyType"])
+    .index("by_severity", ["severity"])
+    .index("by_status", ["status"]),
+
+  intelligenceRecommendations: defineTable({
+    recommendationId: v.string(),
+    type: v.union(
+      v.literal("SHORTAGE_PREVENTION"),
+      v.literal("DONOR_MOBILIZATION"),
+      v.literal("INVENTORY_REBALANCING"),
+      v.literal("LOGISTICS_EXPEDITE")
+    ),
+    priority: v.union(
+      v.literal("LOW"),
+      v.literal("MEDIUM"),
+      v.literal("HIGH"),
+      v.literal("CRITICAL")
+    ),
+    recommendation: v.string(),
+    tradeOffAnalysis: v.string(),
+    supportingSignals: v.array(v.string()),
+    confidence: v.number(),
+    modelVersions: v.array(v.string()),
+    requiresHumanReview: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_type", ["type"])
+    .index("by_priority", ["priority"]),
+
+  simulationRuns: defineTable({
+    simulationId: v.string(),
+    scenarioType: v.union(
+      v.literal("DONOR_ACTIVATION"),
+      v.literal("INTER_HOSPITAL_TRANSFER"),
+      v.literal("DEMAND_SURGE"),
+      v.literal("TRANSIT_DELAY")
+    ),
+    parameters: v.any(),
+    projectedShortage: v.number(),
+    projectedFulfillment: v.number(),
+    networkResilienceScore: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_scenarioType", ["scenarioType"])
+    .index("by_createdAt", ["createdAt"]),
 });
