@@ -1,484 +1,1035 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  ArrowDown,
-  ChevronUp,
-  Heart,
-  Building2,
-  Shield,
-  Activity,
-  Zap,
-  Radio,
-  Lock,
-  Stethoscope,
-  Globe,
-  Truck,
-} from "lucide-react";
-import { useVideoScrub } from "./hooks/useVideoScrub";
-
-const DARK = "#1D3045";
-const VIDEO_SRC =
-  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260821_114821_a8ca298f-be2c-4613-a4dd-51b69e16bbde.mp4";
-
-interface StaggerProps {
-  visible: boolean;
-  delay?: number;
-  children: React.ReactNode;
-  className?: string;
-}
-
-function Stagger({ visible, delay = 0, children, className = "" }: StaggerProps) {
-  return (
-    <div
-      className={className}
-      style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(24px)",
-        transition: `opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 export function App() {
-  const {
-    containerRef,
-    videoRef,
-    canvasRef,
-    scrollProgress: p,
-    canvasLive,
-  } = useVideoScrub(VIDEO_SRC);
-
-  const [navEntered, setNavEntered] = useState(false);
-
-  // Entrance animation after 200ms
   useEffect(() => {
-    const timer = setTimeout(() => setNavEntered(true), 200);
-    return () => clearTimeout(timer);
+    // Set document title
+    document.title = "VeinLink — Decentralized Blood & Organ Donor Network";
+
+    // Small IIFE for animation fallback & menu
+    (function () {
+      const appears = document.querySelectorAll(".appear, .hero-photo");
+
+      // 1. Add .is-in on animationend
+      appears.forEach((el) => {
+        el.addEventListener(
+          "animationend",
+          () => {
+            el.classList.add("is-in");
+          },
+          { once: true }
+        );
+      });
+
+      // 2. JS fallback after two rAFs if animations are not running
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          let hasRunning = false;
+          appears.forEach((el) => {
+            const anims = (el as any).getAnimations ? (el as any).getAnimations() : [];
+            if (anims.some((a: any) => a.playState === "running" || a.playState === "finished")) {
+              hasRunning = true;
+            }
+          });
+          if (!hasRunning) {
+            appears.forEach((el) => el.classList.add("is-in"));
+          }
+        });
+      });
+
+      // 3. Burger menu toggle & Esc handler
+      const burger = document.getElementById("burger-btn");
+      const backdrop = document.querySelector(".menu-backdrop");
+      const navLinks = document.querySelectorAll("#site-nav a");
+
+      function toggleMenu(force?: boolean) {
+        const nextState = force !== undefined ? force : !document.body.classList.contains("menu-open");
+        if (nextState) {
+          document.body.classList.add("menu-open");
+          burger?.setAttribute("aria-expanded", "true");
+          burger?.setAttribute("aria-label", "Close menu");
+        } else {
+          document.body.classList.remove("menu-open");
+          burger?.setAttribute("aria-expanded", "false");
+          burger?.setAttribute("aria-label", "Open menu");
+        }
+      }
+
+      burger?.addEventListener("click", () => toggleMenu());
+      backdrop?.addEventListener("click", () => toggleMenu(false));
+      navLinks.forEach((link) => link.addEventListener("click", () => toggleMenu(false)));
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") toggleMenu(false);
+      });
+
+      window.addEventListener("resize", () => {
+        if (window.innerWidth >= 901) toggleMenu(false);
+      });
+    })();
   }, []);
 
-  // Section Opacities derived directly from scroll progress p
-  const s1Opacity = p < 0.2 ? 1 : Math.max(0, 1 - (p - 0.2) / 0.08);
-
-  const s2Opacity =
-    p < 0.32
-      ? 0
-      : p < 0.4
-      ? (p - 0.32) / 0.08
-      : p < 0.55
-      ? 1
-      : Math.max(0, 1 - (p - 0.55) / 0.08);
-
-  const s3Opacity = p < 0.67 ? 0 : p < 0.75 ? (p - 0.67) / 0.08 : 1;
-
-  // Stagger visibility threshold > 0.3
-  const s1Visible = s1Opacity > 0.3;
-  const s2Visible = s2Opacity > 0.3;
-  const s3Visible = s3Opacity > 0.3;
-
-  // Color flips at p > 0.55: DARK -> white (duration-500)
-  const isDarkNav = p > 0.55;
-  const navColor = isDarkNav ? "#ffffff" : DARK;
-
-  const scrollToProgress = (targetP: number) => {
-    if (!containerRef.current) return;
-    const maxScroll = containerRef.current.offsetHeight - window.innerHeight;
-    window.scrollTo({
-      top: targetP * maxScroll,
-      behavior: "smooth",
-    });
-  };
-
   return (
-    <div className="relative w-full bg-black text-white">
-      {/* 1. Interactive Video Scrubbing Container */}
-      <div
-        ref={containerRef}
-        className="relative h-[450vh] w-full select-none"
-        style={{
-          fontFamily:
-            "'Helvetica Neue ME', 'Helvetica Neue', Helvetica, Arial, sans-serif",
-        }}
-      >
-        {/* Inner Sticky Scene */}
-        <div className="sticky top-0 w-full h-screen overflow-hidden">
-          {/* <video> full cover */}
-          <video
-            ref={videoRef}
-            src={VIDEO_SRC}
-            muted
-            playsInline
-            preload="auto"
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-          />
+    <div className="vesper-root" style={{ background: "#000", color: "#fff" }}>
+      {/* Exact Google Fonts */}
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900&family=Instrument+Serif:ital@1&display=swap"
+      />
 
-          {/* <canvas width=1920 height=1080> */}
-          <canvas
-            ref={canvasRef}
-            width={1920}
-            height={1080}
-            className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-300 ${
-              canvasLive ? "opacity-100" : "opacity-0"
-            }`}
-          />
+      <style dangerouslySetInnerHTML={{ __html: `
+        /* Force black immediately */
+        html, body {
+          background: #000000 !important;
+          color: #ffffff;
+        }
+        html, body {
+          background: #000000;
+          background: var(--bg, #000000);
+          color: #ffffff;
+          color: var(--text, #ffffff);
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: optimizeLegibility;
+          overflow-x: hidden;
+          position: relative;
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+          font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        html { scroll-behavior: smooth; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        a { color: inherit; text-decoration: none; }
+        button { font-family: inherit; }
 
-          {/* Overlay containing Navbar + 3 sequential sections */}
-          <div className="absolute inset-0 pointer-events-none">
-            {/* NAVBAR */}
-            <nav className="absolute top-0 left-0 right-0 z-50 pointer-events-auto px-6 sm:px-8 md:px-12 pt-8 sm:pt-12 pb-6 flex items-center justify-between">
-              {/* Left: Brand logo */}
-              <div
-                style={{
-                  opacity: navEntered ? 1 : 0,
-                  transform: navEntered ? "translateY(0)" : "translateY(-12px)",
-                  transition:
-                    "opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1) 100ms, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) 100ms, color 500ms ease",
-                  color: navColor,
-                }}
-              >
-                <Link href="/" className="flex items-center gap-2 group">
-                  <span className="text-base sm:text-lg tracking-[0.25em] uppercase font-bold transition-colors duration-500">
-                    VEIN<span className="text-red-500">LINK</span>
-                  </span>
-                </Link>
-              </div>
+        :root {
+          --bg: #000000;
+          --text: #ffffff;
+          --muted: #9a9a9a;
+          --stat: #d8d8d8;
+          --border: rgba(255, 255, 255, 0.16);
+          --border-soft: rgba(255, 255, 255, 0.12);
 
-              {/* Right: Get Started button */}
-              <div
-                style={{
-                  opacity: navEntered ? 1 : 0,
-                  transform: navEntered ? "translateY(0)" : "translateY(-12px)",
-                  transition:
-                    "opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1) 300ms, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) 300ms",
-                }}
-              >
-                <Link
-                  href="/auth"
-                  className="px-5 py-2 sm:px-6 sm:py-2.5 rounded-lg text-xs sm:text-sm font-semibold bg-[#ef4444] hover:bg-[#dc2626] text-white shadow-lg shadow-red-500/25 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
-                >
-                  Get Started
-                  <ArrowRight size={15} />
-                </Link>
-              </div>
-            </nav>
+          --logo: 15.5px;
+          --logo-mark: 22px;
+          --nav: 14px;
+          --nav-h: 40px;
+          --btn: 13.5px;
+          --btn-h: 40px;
+          --hero-btn-h: 42px;
+          --h1: 48px;
+          --lede: 15.5px;
+          --badge: 12.5px;
+          --stat-size: 13.5px;
+          --header-y: 22px;
+          --header-x: 40px;
+          --stats-x: 72px;
+          --stats-y: 36px;
+          --hero-gap: 85px;
+          --copy-max: 860px;
+          --lede-max: 520px;
+        }
 
-            {/* SECTION 1: Hero */}
-            <div
-              className="absolute inset-0 px-6 sm:px-8 md:px-20 lg:px-32 flex flex-col justify-center"
-              style={{
-                opacity: s1Opacity,
-                transition: "opacity 0.1s ease-out",
-                pointerEvents: s1Opacity > 0.05 ? "auto" : "none",
-              }}
+        /* Desktop Lock (≥901px) */
+        @media (min-width: 901px) {
+          html, body {
+            height: 100%;
+            overflow: hidden;
+          }
+          .page {
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+          }
+        }
+
+        /* Background Video */
+        .hero-photo {
+          position: fixed;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          z-index: 0;
+          opacity: 1;
+          pointer-events: none;
+        }
+
+        .grain {
+          position: fixed;
+          inset: 0;
+          z-index: 100;
+          pointer-events: none;
+          opacity: 0.035;
+          background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        .page {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          grid-template-rows: auto 1fr auto;
+          min-height: 100vh;
+          min-height: 100dvh;
+        }
+
+        /* Header */
+        header.header {
+          display: grid;
+          grid-template-columns: 1fr auto 1fr;
+          align-items: center;
+          padding: var(--header-y) var(--header-x) 10px;
+          z-index: 50;
+          position: relative;
+        }
+
+        .logo {
+          display: inline-flex;
+          align-items: center;
+          gap: 9px;
+          justify-self: start;
+          font-size: var(--logo);
+          font-weight: 700;
+          letter-spacing: -0.03em;
+          color: #fff;
+        }
+
+        .logo-suffix {
+          font-weight: 500;
+          color: #ef4444;
+        }
+
+        #site-nav {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          justify-self: center;
+        }
+
+        /* Liquid-Metal Pill */
+        .nav-pill {
+          height: var(--nav-h);
+          padding: 0 18px;
+          border-radius: 7px;
+          overflow: hidden;
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: 1px solid rgba(198,198,198,0.55);
+          background: linear-gradient(105deg, #050505 0%, #2a2a2a 48%, #4a4a4a 100%);
+          color: #f3f3f3;
+          font-size: var(--nav);
+          font-weight: 400;
+          letter-spacing: -0.01em;
+          white-space: nowrap;
+          transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+        }
+
+        .nav-pill::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.16) 50%, transparent 70%);
+          transform: translateX(-120%);
+          transition: transform 0.6s ease;
+          pointer-events: none;
+        }
+
+        .nav-pill:hover::before {
+          transform: translateX(120%);
+        }
+
+        .nav-pill:hover {
+          border-color: rgba(235,235,235,0.9);
+          background: linear-gradient(105deg, #111 0%, #3a3a3a 45%, #6a6a6a 100%);
+          box-shadow: 0 0 18px rgba(200,210,230,0.18);
+        }
+
+        /* Buttons (Liquid-Glass Language) */
+        .btn {
+          position: relative;
+          isolation: isolate;
+          overflow: hidden;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          height: var(--btn-h);
+          padding: 0 16px;
+          border-radius: 6px;
+          font-size: var(--btn);
+          font-weight: 500;
+          letter-spacing: -0.02em;
+          line-height: 1;
+          white-space: nowrap;
+          cursor: pointer;
+          transition: background 0.35s ease, border 0.35s ease, box-shadow 0.35s ease, color 0.35s ease, filter 0.35s ease;
+        }
+
+        .btn::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.45) 48%, transparent 76%);
+          transform: translateX(-130%);
+          transition: transform 0.65s ease;
+          pointer-events: none;
+        }
+
+        .btn:hover::after {
+          transform: translateX(130%);
+        }
+
+        .btn-solid {
+          background: linear-gradient(180deg, #ffffff 0%, #e7e7e7 48%, #cfcfcf 100%);
+          color: #111;
+          border: 1px solid #fff;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.95);
+        }
+
+        .btn-solid:hover {
+          background: linear-gradient(180deg, #fff 0%, #f3f6ff 42%, #d5def2 100%);
+          border-color: #f2f6ff;
+          box-shadow: inset 0 1px 0 #fff, 0 0 22px rgba(186,208,255,0.35), 0 8px 18px rgba(255,255,255,0.12);
+        }
+
+        .hero-actions .btn-solid:hover {
+          box-shadow: inset 0 1px 0 #fff, 0 0 26px rgba(186,208,255,0.4), 0 8px 18px rgba(255,255,255,0.14);
+        }
+
+        .btn-ghost-hero {
+          background: linear-gradient(135deg, rgba(255,255,255,0.12), rgba(0,0,0,0.5) 46%, rgba(150,170,200,0.1));
+          color: #fff;
+          border: 1px solid rgba(198,198,198,0.55);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+        }
+
+        .btn-ghost-hero:hover {
+          border-color: rgba(220,230,255,0.8);
+          box-shadow: 0 0 24px rgba(170,200,255,0.28);
+        }
+
+        .header-cta {
+          justify-self: end;
+        }
+
+        /* Burger button */
+        .burger {
+          display: none;
+          width: 42px;
+          height: 42px;
+          border-radius: 6px;
+          border: 1px solid var(--border);
+          background: rgba(8,8,8,0.55);
+          z-index: 60;
+          cursor: pointer;
+          align-items: center;
+          justify-content: center;
+          flex-direction: column;
+          gap: 5px;
+          transition: border-color 0.25s ease, background 0.25s ease;
+        }
+
+        .burger:hover {
+          border-color: rgba(255,255,255,0.32);
+          background: rgba(255,255,255,0.05);
+        }
+
+        .burger span {
+          display: block;
+          width: 16px;
+          height: 1.5px;
+          background: #fff;
+          border-radius: 1px;
+          transition: transform 0.25s ease, opacity 0.2s ease;
+        }
+
+        body.menu-open .burger span:nth-child(1) {
+          transform: translateY(6.5px) rotate(45deg);
+        }
+        body.menu-open .burger span:nth-child(2) {
+          opacity: 0;
+        }
+        body.menu-open .burger span:nth-child(3) {
+          transform: translateY(-6.5px) rotate(-45deg);
+        }
+
+        /* Menu Backdrop */
+        .menu-backdrop {
+          display: none;
+        }
+
+        /* Hero (Bottom-centered) */
+        .hero {
+          display: flex;
+          align-items: flex-end;
+          justify-content: center;
+          padding: 8px 24px var(--hero-gap);
+          min-height: 0;
+        }
+
+        .hero-copy {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          max-width: var(--copy-max);
+          width: 100%;
+        }
+
+        .badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 22px;
+          padding: 9px 15px;
+          border: 0;
+          border-radius: 5px;
+          background: linear-gradient(90deg, #7d7d7d 0%, #2a2a2a 52%, #0a0a0a 100%);
+          color: #f2f2f2;
+          font-size: var(--badge);
+          font-weight: 400;
+          letter-spacing: -0.01em;
+        }
+
+        .badge-star {
+          filter: drop-shadow(0 0 3px rgba(255,255,255,0.45));
+        }
+
+        h1.headline {
+          font-size: var(--h1);
+          font-weight: 500;
+          letter-spacing: -0.045em;
+          line-height: 1.12;
+          color: #fff;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
+        .headline-line {
+          display: block;
+          overflow: hidden;
+          padding: 0.06em 0.15em 0.14em;
+        }
+
+        h1 em {
+          font-family: "Instrument Serif", "Times New Roman", Times, serif;
+          font-style: italic;
+          font-weight: 400;
+          font-size: 1.08em;
+          letter-spacing: -0.03em;
+          color: #9a9a9a;
+        }
+
+        .lede {
+          max-width: var(--lede-max);
+          margin-top: 18px;
+          color: #9a9a9a;
+          font-size: var(--lede);
+          font-weight: 400;
+          line-height: 1.55;
+          letter-spacing: -0.015em;
+        }
+
+        .hero-actions {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 10px;
+          margin-top: 26px;
+        }
+
+        .hero-actions .btn {
+          height: var(--hero-btn-h);
+          padding: 0 18px;
+        }
+
+        /* Stats Footer */
+        .stats {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 24px;
+          padding: 0 var(--stats-x) var(--stats-y);
+          padding-bottom: max(var(--stats-y), env(safe-area-inset-bottom));
+          color: #d8d8d8;
+        }
+
+        .stat {
+          display: inline-flex;
+          align-items: center;
+          gap: 14px;
+          font-size: var(--stat-size);
+          letter-spacing: -0.015em;
+          white-space: nowrap;
+        }
+
+        .stat-icon {
+          width: 20px;
+          height: 20px;
+          color: #e8e8e8;
+          flex-shrink: 0;
+        }
+
+        .stat-icon-wide {
+          width: 38px;
+          height: 21px;
+          flex-shrink: 0;
+        }
+
+        /* Entrance Motion */
+        .appear {
+          opacity: 1;
+          animation-duration: 1.05s;
+          animation-fill-mode: both;
+          animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+          animation-delay: var(--d, 0.08s);
+        }
+
+        .is-in {
+          animation: none !important;
+          opacity: 1 !important;
+          transform: none !important;
+          clip-path: none !important;
+          filter: none !important;
+        }
+
+        .appear--scale { animation-name: in-scale; }
+        .appear--soft { animation-name: in-soft; }
+        .appear--pop { animation-name: in-pop; }
+        .appear--mask { animation-name: in-mask; }
+        .appear--btn { animation-name: in-btn; }
+        .appear--side { animation-name: in-side; }
+        .appear--stat { animation-name: in-stat; }
+
+        @keyframes in-scale {
+          0% { opacity: 0; transform: scale(0.84); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes in-soft {
+          0% { opacity: 0; transform: translateY(14px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes in-pop {
+          0% { opacity: 0; transform: scale(0.9); }
+          70% { transform: scale(1.03); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes in-mask {
+          0% { opacity: 0; transform: translateY(40%); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes in-btn {
+          0% { opacity: 0; transform: translateY(18px) scale(0.94); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes in-side {
+          0% { opacity: 0; transform: translateX(22px); }
+          100% { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes in-stat {
+          0% { opacity: 0; transform: translateY(20px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes in-star {
+          0% { opacity: 0; transform: scale(0.2) rotate(-50deg); }
+          65% { transform: scale(1.2) rotate(8deg); }
+          100% { opacity: 1; transform: scale(1) rotate(0); }
+        }
+        @keyframes in-em {
+          0% { opacity: 0.35; filter: blur(4px); }
+          100% { opacity: 1; filter: blur(0); }
+        }
+
+        .badge-star {
+          animation: in-star 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
+        }
+
+        h1 em {
+          animation: in-em 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.72s both;
+        }
+
+        .lede.appear {
+          animation-duration: 1.25s;
+        }
+
+        /* Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            transition: none !important;
+            animation: none !important;
+          }
+          .appear, .hero-photo, .hero h1 em, .badge-star {
+            opacity: 1 !important;
+            transform: none !important;
+            clip-path: none !important;
+            filter: none !important;
+          }
+        }
+
+        /* Responsive Breakpoints */
+        @media (min-width: 1600px) {
+          :root {
+            --logo: 17px;
+            --logo-mark: 24px;
+            --nav: 15px;
+            --nav-h: 44px;
+            --btn: 15px;
+            --btn-h: 44px;
+            --hero-btn-h: 48px;
+            --h1: 64px;
+            --lede: 18px;
+            --badge: 13.5px;
+            --stat-size: 15px;
+            --header-y: 28px;
+            --header-x: 64px;
+            --stats-x: 96px;
+            --stats-y: 44px;
+            --copy-max: 980px;
+            --lede-max: 580px;
+          }
+          .nav-pill { padding: 0 20px; }
+          .badge { margin-bottom: 26px; }
+          .lede { margin-top: 22px; }
+          .hero-actions { margin-top: 30px; gap: 12px; }
+          .stat-icon { width: 22px; height: 22px; }
+          .stat-icon-wide { width: 45px; height: 24px; }
+        }
+
+        @media (min-width: 1920px) {
+          :root {
+            --logo: 18px;
+            --logo-mark: 26px;
+            --nav: 16px;
+            --nav-h: 48px;
+            --btn: 16px;
+            --btn-h: 48px;
+            --hero-btn-h: 52px;
+            --h1: 76px;
+            --lede: 20px;
+            --badge: 14.5px;
+            --stat-size: 16px;
+            --header-y: 32px;
+            --header-x: 80px;
+            --stats-x: 120px;
+            --stats-y: 52px;
+            --copy-max: 1120px;
+            --lede-max: 640px;
+          }
+          #site-nav { gap: 10px; }
+          .nav-pill { padding: 0 22px; }
+          .btn { padding: 0 22px; }
+          .badge { padding: 10px 15px; }
+          .stat-icon-wide { width: 48px; height: 26px; }
+        }
+
+        @media (min-width: 2560px) {
+          :root {
+            --h1: 88px;
+            --lede: 22px;
+            --header-x: 120px;
+            --stats-x: 160px;
+            --copy-max: 1280px;
+            --lede-max: 700px;
+          }
+        }
+
+        @media (min-width: 1280px) and (max-width: 1599px) {
+          :root {
+            --h1: 54px;
+            --lede: 16px;
+            --header-x: 48px;
+            --stats-x: 80px;
+            --copy-max: 900px;
+          }
+        }
+
+        @media (min-width: 901px) and (max-width: 1279px) {
+          :root {
+            --logo: 15px;
+            --nav: 13px;
+            --nav-h: 36px;
+            --btn: 13px;
+            --btn-h: 38px;
+            --hero-btn-h: 40px;
+            --h1: 42px;
+            --lede: 15px;
+            --badge: 12px;
+            --stat-size: 12.5px;
+            --header-y: 16px;
+            --header-x: 28px;
+            --stats-x: 28px;
+            --stats-y: 36px;
+            --hero-gap: 64px;
+            --copy-max: 760px;
+            --lede-max: 460px;
+          }
+          .nav-pill { padding: 0 14px; }
+          .badge { margin-bottom: 16px; }
+          .lede { margin-top: 14px; }
+          .hero-actions { margin-top: 20px; }
+        }
+
+        @media (min-width: 901px) and (max-height: 850px) {
+          :root {
+            --header-y: 14px;
+            --stats-y: 24px;
+            --hero-gap: 48px;
+            --h1: 40px;
+          }
+          .badge { margin-bottom: 12px; }
+          .lede { margin-top: 12px; }
+          .hero-actions { margin-top: 16px; }
+        }
+
+        @media (min-width: 901px) and (max-height: 720px) {
+          :root {
+            --h1: 34px;
+            --lede: 14px;
+            --hero-gap: 32px;
+            --stats-y: 18px;
+            --nav-h: 30px;
+            --btn-h: 34px;
+            --hero-btn-h: 36px;
+          }
+          .badge { margin-bottom: 8px; }
+        }
+
+        /* Mobile (≤900px) */
+        @media (max-width: 900px) {
+          html, body {
+            height: auto;
+            overflow-y: auto;
+          }
+          header.header {
+            grid-template-columns: 1fr auto auto;
+            gap: 8px;
+            padding: 16px 18px 10px;
+          }
+          .logo, .header-cta, .burger {
+            z-index: 80;
+          }
+          .burger {
+            display: inline-flex;
+          }
+          #site-nav {
+            display: none;
+          }
+          .menu-backdrop {
+            display: block;
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            background: rgba(8,8,8,0.42);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.28s ease, visibility 0.28s ease;
+          }
+          body.menu-open .menu-backdrop {
+            opacity: 1;
+            visibility: visible;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+          }
+          body.menu-open #site-nav {
+            display: flex;
+            position: fixed;
+            inset: 0;
+            z-index: 45;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 96px 22px 32px;
+            padding-top: max(96px, calc(env(safe-area-inset-top) + 88px));
+            background: transparent;
+          }
+          body.menu-open #site-nav .nav-pill {
+            width: 100%;
+            height: 56px;
+            font-size: 19px;
+            border-radius: 10px;
+          }
+          body.menu-open {
+            overflow: hidden;
+          }
+          .hero {
+            padding: 20px 20px 64px;
+            align-items: flex-end;
+          }
+          .stats {
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 28px;
+            white-space: normal;
+          }
+          :root {
+            --logo: 16px;
+            --btn: 15px;
+            --btn-h: 46px;
+            --hero-btn-h: 48px;
+            --h1: 36px;
+            --lede: 16.5px;
+            --badge: 13.5px;
+            --stat-size: 15px;
+            --hero-gap: 36px;
+            --copy-max: 100%;
+            --lede-max: 100%;
+          }
+        }
+
+        @media (max-width: 560px) {
+          :root {
+            --h1: 34px;
+            --lede: 16px;
+            --header-x: 16px;
+          }
+          .hero-actions {
+            flex-direction: column;
+            width: 100%;
+          }
+          .hero-actions .btn {
+            width: 100%;
+          }
+        }
+      `}} />
+
+      {/* 1. Grain overlay */}
+      <div className="grain" />
+
+      {/* 2. Hero video background 100% opacity no overlay */}
+      <video
+        autoPlay
+        muted
+        loop
+        playsInline
+        className="hero-photo"
+        src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260818_072341_50851634-bbc3-4c33-9acc-7647d4db44aa.mp4"
+      />
+
+      {/* 3. Page Structure */}
+      <div className="page">
+        {/* Mobile menu backdrop */}
+        <div className="menu-backdrop" />
+
+        {/* HEADER */}
+        <header className="header">
+          {/* Left: Brand Logo */}
+          <Link
+            href="#top"
+            className="logo appear appear--scale"
+            style={{ ["--d" as any]: "0.08s" }}
+            aria-label="VeinLink Network"
+          >
+            <svg
+              className="logo-mark"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="currentColor"
             >
-              <div className="max-w-4xl">
-                <Stagger visible={s1Visible} delay={0}>
-                  <h1
-                    className="font-light uppercase leading-[1.2]"
-                    style={{
-                      fontSize: "clamp(2rem, 5vw, 5rem)",
-                      color: DARK,
-                    }}
-                  >
-                    Empowering Life Through Blood Donations
-                  </h1>
-                </Stagger>
+              <g transform="rotate(-30 12 12)">
+                <circle cx="7.3" cy="3.2" r="1.45" />
+                <rect x="5.5" y="4.7" width="3.6" height="14.6" rx="1.8" />
+                <rect x="14.9" y="4.7" width="3.6" height="14.6" rx="1.8" />
+                <circle cx="16.7" cy="20.8" r="1.45" />
+              </g>
+            </svg>
+            <span>
+              Vein<span className="logo-suffix">Link</span>
+            </span>
+          </Link>
 
-                <Stagger visible={s1Visible} delay={150}>
-                  <p
-                    className="mt-6 text-sm tracking-[0.3em] uppercase"
-                    style={{ color: `${DARK}e6` }}
-                  >
-                    Intelligent, AI-Assisted Donor & Organ Network
-                  </p>
-                </Stagger>
-              </div>
-
-              {/* Bottom-right circle button */}
-              <div className="absolute bottom-12 right-6 sm:right-8 md:right-12 pointer-events-auto">
-                <Stagger visible={s1Visible} delay={300}>
-                  <button
-                    onClick={() => scrollToProgress(0.45)}
-                    className="w-12 h-12 rounded-full flex items-center justify-center transition-opacity hover:opacity-70 cursor-pointer"
-                    style={{
-                      border: `1px solid ${DARK}80`,
-                      color: DARK,
-                    }}
-                    aria-label="Scroll to next section"
-                  >
-                    <ArrowRight size={18} />
-                  </button>
-                </Stagger>
-              </div>
-            </div>
-
-            {/* SECTION 2: Center */}
-            <div
-              className="absolute inset-0 px-6 sm:px-8 flex flex-col items-center justify-center"
-              style={{
-                opacity: s2Opacity,
-                transition: "opacity 0.1s ease-out",
-                pointerEvents: s2Opacity > 0.05 ? "auto" : "none",
-              }}
+          {/* Center: Nav Pills */}
+          <nav id="site-nav" aria-label="Primary">
+            <Link
+              href="/donor/dashboard"
+              className="nav-pill appear appear--scale"
+              style={{ ["--d" as any]: "0.16s" }}
             >
-              <div className="max-w-[950px] mx-auto text-center">
-                <Stagger visible={s2Visible} delay={0}>
-                  <h2
-                    className="font-extralight tracking-wide leading-[1.3] uppercase"
-                    style={{
-                      fontSize: "clamp(1.5rem, 4.5vw, 4.5rem)",
-                      color: DARK,
-                    }}
-                  >
-                    We predict critical shortages with vision{" "}
-                    <span style={{ color: `${DARK}cc` }}>and precision</span>{" "}
-                    <span style={{ color: `${DARK}80` }}>
-                      saving lives across every hospital
-                    </span>
-                  </h2>
-                </Stagger>
-              </div>
-
-              {/* Right column navigation controls */}
-              <div className="absolute bottom-16 right-6 sm:right-8 md:right-12 flex flex-col items-center gap-4 pointer-events-auto">
-                <Stagger visible={s2Visible} delay={200}>
-                  <button
-                    onClick={() => scrollToProgress(0.85)}
-                    className="w-12 h-12 rounded-full flex items-center justify-center hover:opacity-70 transition-opacity cursor-pointer"
-                    style={{
-                      border: `1px solid ${DARK}66`,
-                      color: DARK,
-                    }}
-                    aria-label="Scroll to next section"
-                  >
-                    <ArrowDown size={18} />
-                  </button>
-                </Stagger>
-
-                <Stagger visible={s2Visible} delay={350}>
-                  <div className="mt-4 flex flex-col items-center gap-2">
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: DARK }}
-                    />
-                    <div
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ backgroundColor: `${DARK}66` }}
-                    />
-                    <div
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ backgroundColor: `${DARK}66` }}
-                    />
-                  </div>
-                </Stagger>
-
-                <Stagger visible={s2Visible} delay={500}>
-                  <button
-                    onClick={() => scrollToProgress(0)}
-                    className="mt-2 w-10 h-10 rounded-full flex items-center justify-center hover:opacity-70 transition-opacity cursor-pointer"
-                    style={{
-                      border: `1px solid ${DARK}4d`,
-                      color: `${DARK}cc`,
-                    }}
-                    aria-label="Scroll to top"
-                  >
-                    <ChevronUp size={16} />
-                  </button>
-                </Stagger>
-              </div>
-            </div>
-
-            {/* SECTION 3: Right-aligned CTA */}
-            <div
-              className="absolute inset-0 px-6 sm:px-8 md:px-20 lg:px-32 flex items-center justify-end"
-              style={{
-                opacity: s3Opacity,
-                transition: "opacity 0.1s ease-out",
-                pointerEvents: s3Opacity > 0.05 ? "auto" : "none",
-              }}
+              Donor Network
+            </Link>
+            <Link
+              href="/hospital/dashboard"
+              className="nav-pill appear appear--soft"
+              style={{ ["--d" as any]: "0.28s" }}
             >
-              <div className="max-w-2xl text-left">
-                <Stagger visible={s3Visible} delay={0}>
-                  <p className="text-white/60 text-lg tracking-wide mb-4">
-                    VeinLink Network
-                  </p>
-                </Stagger>
+              Hospital Portal
+            </Link>
+            <Link
+              href="/admin/ai-monitor"
+              className="nav-pill appear appear--scale"
+              style={{ ["--d" as any]: "0.40s" }}
+            >
+              AI Allocation
+            </Link>
+            <Link
+              href="/admin/blockchain"
+              className="nav-pill appear appear--soft"
+              style={{ ["--d" as any]: "0.52s" }}
+            >
+              Trust Ledger
+            </Link>
+          </nav>
 
-                <Stagger visible={s3Visible} delay={150}>
-                  <h2
-                    className="font-light text-white leading-[1.2] uppercase tracking-wide mb-8"
-                    style={{ fontSize: "clamp(2rem, 4vw, 4rem)" }}
-                  >
-                    Saving lives,
-                    <br />
-                    shaping tomorrow.
-                  </h2>
-                </Stagger>
+          {/* Right: CTA & Burger */}
+          <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: "8px" }}>
+            <Link
+              href="/auth"
+              className="btn btn-solid header-cta appear appear--scale"
+              style={{ ["--d" as any]: "0.34s" }}
+            >
+              Get Started
+            </Link>
 
-                <Stagger visible={s3Visible} delay={300}>
-                  <div className="flex items-center gap-4 pointer-events-auto">
-                    <Link
-                      href="/auth"
-                      className="text-sm tracking-[0.3em] text-white/80 uppercase hover:text-white transition-colors"
-                    >
-                      Get Started
-                    </Link>
-                    <Link
-                      href="/auth"
-                      className="w-10 h-10 rounded-full bg-white text-gray-800 flex items-center justify-center hover:scale-110 transition-transform duration-300 shadow-lg"
-                      aria-label="Get Started"
-                    >
-                      <ArrowRight size={16} />
-                    </Link>
-                  </div>
-                </Stagger>
-              </div>
-            </div>
+            <button
+              id="burger-btn"
+              className="burger appear appear--scale"
+              style={{ ["--d" as any]: "0.34s" }}
+              aria-controls="site-nav"
+              aria-expanded="false"
+              aria-label="Open menu"
+            >
+              <span />
+              <span />
+              <span />
+            </button>
           </div>
-        </div>
-      </div>
+        </header>
 
-      {/* 2. FOOTER SECTION */}
-      <footer className="relative z-30 bg-zinc-950 border-t border-zinc-800/80 px-6 sm:px-12 md:px-20 py-16 text-zinc-400">
-        <div className="max-w-7xl mx-auto space-y-12">
-          {/* Main Footer Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 sm:gap-10">
-            {/* Column 1: Brand Info */}
-            <div className="lg:col-span-2 space-y-4">
-              <Link href="/" className="inline-flex items-center gap-2">
-                <span className="text-xl tracking-[0.2em] uppercase font-bold text-white">
-                  VEIN<span className="text-red-500">LINK</span>
-                </span>
+        {/* HERO (Bottom-centered) */}
+        <main className="hero" id="top">
+          <div className="hero-copy">
+            {/* Badge */}
+            <div
+              className="badge appear appear--pop"
+              style={{ ["--d" as any]: "0.22s" }}
+            >
+              <svg
+                className="badge-star"
+                width="18"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="white"
+              >
+                <path d="M12 2.6C12.55 2.6 12.88 3.15 13.08 4.7c.62 4.7 1.52 5.6 6.22 6.22 1.55.2 2.1.53 2.1 1.08s-.55.88-2.1 1.08c-4.7.62-5.6 1.52-6.22 6.22-.2 1.55-.53 2.1-1.08 2.1s-.88-.55-1.08-2.1c-.62-4.7-1.52-5.6-6.22-6.22C3.15 12.88 2.6 12.55 2.6 12s.55-.88 2.1-1.08c4.7-.62 5.6-1.52 6.22-6.22C11.12 3.15 11.45 2.6 12 2.6Z" />
+              </svg>
+              <span>Decentralized Blood & Organ Trust Network</span>
+            </div>
+
+            {/* H1 */}
+            <h1 className="headline">
+              <span
+                className="headline-line appear appear--mask"
+                style={{ ["--d" as any]: "0.42s" }}
+              >
+                Connecting <em>life donors</em> with
+              </span>
+              <span
+                className="headline-line appear appear--mask"
+                style={{ ["--d" as any]: "0.62s" }}
+              >
+                transplant centers in seconds.
+              </span>
+            </h1>
+
+            {/* Lede */}
+            <p
+              className="lede appear appear--soft"
+              style={{ ["--d" as any]: "0.82s" }}
+            >
+              Intelligent real-time donor matching, Pareto-optimized organ allocation, and cold-chain logistics powered by zero-knowledge trust.
+            </p>
+
+            {/* Actions */}
+            <div className="hero-actions">
+              <Link
+                href="/auth"
+                className="btn btn-solid appear appear--btn"
+                style={{ ["--d" as any]: "0.96s" }}
+              >
+                Join as Donor
               </Link>
-              <p className="text-xs sm:text-sm text-zinc-400 max-w-sm leading-relaxed">
-                Next-generation intelligent donor matching, organ allocation review, and cold-chain logistics network powered by Convex, FastAPI, and cryptographic trust provenance.
-              </p>
-              <div className="flex items-center gap-3 pt-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
-                  <Radio className="w-3 h-3 animate-pulse text-emerald-400" /> Real-Time Network Active
-                </span>
-              </div>
-            </div>
-
-            {/* Column 2: Donor Portal */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Heart className="w-3.5 h-3.5 text-red-500" /> Donor Portal
-              </h4>
-              <ul className="space-y-2 text-xs">
-                <li>
-                  <Link href="/donor/dashboard" className="hover:text-white transition-colors">
-                    Donor Dashboard
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/donor/organ/opportunities" className="hover:text-white transition-colors">
-                    Organ Opportunities
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/donor/organ/preferences" className="hover:text-white transition-colors">
-                    Living Evaluation Request
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/donor/requests" className="hover:text-white transition-colors">
-                    Blood Matches
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Column 3: Hospital Operations */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-blue-500" /> Hospital Portal
-              </h4>
-              <ul className="space-y-2 text-xs">
-                <li>
-                  <Link href="/hospital/dashboard" className="hover:text-white transition-colors">
-                    Hospital Dashboard
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/hospital/emergency" className="hover:text-white transition-colors">
-                    Emergency Center
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/hospital/organs/requests" className="hover:text-white transition-colors">
-                    Organ Requests
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/hospital/organ-evaluations" className="hover:text-white transition-colors">
-                    Evaluation Queue
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/hospital/verification" className="hover:text-white transition-colors">
-                    Donor Verifications
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Column 4: Intelligence & Governance */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-purple-500" /> Network Admin
-              </h4>
-              <ul className="space-y-2 text-xs">
-                <li>
-                  <Link href="/admin/dashboard" className="hover:text-white transition-colors">
-                    Admin Intelligence
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/admin/automation" className="hover:text-white transition-colors">
-                    n8n Automation Monitor
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/admin/ai-monitor" className="hover:text-white transition-colors">
-                    AI Telemetry Stream
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/admin/blockchain" className="hover:text-white transition-colors">
-                    Blockchain Trust Ledger
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/admin/logistics" className="hover:text-white transition-colors">
-                    Cold-Chain Logistics
-                  </Link>
-                </li>
-              </ul>
+              <Link
+                href="/auth"
+                className="btn btn-ghost-hero appear appear--side"
+                style={{ ["--d" as any]: "1.10s" }}
+              >
+                Hospital & Admin Portal
+              </Link>
             </div>
           </div>
+        </main>
 
-          {/* Bottom Bar */}
-          <div className="pt-8 border-t border-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
-            <div>
-              © 2026 VeinLink Healthcare Network. Built for emergency response & life preservation.
-            </div>
-            <div className="flex items-center gap-6">
-              <span className="flex items-center gap-1.5">
-                <Lock className="w-3.5 h-3.5 text-zinc-400" /> Zero-PHI On-Chain Integrity
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Stethoscope className="w-3.5 h-3.5 text-zinc-400" /> Clinical Oversight Invariant
-              </span>
-            </div>
+        {/* STATS FOOTER */}
+        <footer className="stats">
+          {/* Stat 1: Verified Matches */}
+          <div
+            className="stat appear appear--stat"
+            style={{ ["--d" as any]: "1.12s" }}
+          >
+            <svg className="stat-icon" viewBox="0 0 24 24">
+              <defs>
+                <linearGradient id="grad-pill-left" x1="3" y1="2" x2="14" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.38" />
+                  <stop offset="100%" stopColor="#ef4444" stopOpacity="0.8" />
+                </linearGradient>
+                <linearGradient id="grad-pill-right" x1="13" y1="2" x2="24" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#ef4444" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.62" />
+                </linearGradient>
+              </defs>
+              <rect x="3.4" y="2.6" width="7.2" height="18.8" rx="3.6" fill="url(#grad-pill-left)" />
+              <rect x="13.4" y="2.6" width="7.2" height="18.8" rx="3.6" fill="url(#grad-pill-right)" />
+              <rect x="9.2" y="10.9" width="5.6" height="2.2" rx="1.1" fill="#4a4a4a" />
+            </svg>
+            <span>100% Verified Clinical Donor Matches</span>
           </div>
-        </div>
-      </footer>
+
+          {/* Stat 2: Emergency Response */}
+          <div
+            className="stat appear appear--stat"
+            style={{ ["--d" as any]: "1.28s" }}
+          >
+            <svg className="stat-icon" viewBox="0 0 24 24">
+              <rect x="2.4" y="2.4" width="19.2" height="19.2" rx="6.2" fill="#ffffff" />
+              <path d="M12 7.1v7.4" stroke="#111" strokeWidth="1.85" strokeLinecap="round" />
+              <path d="M8.15 12.35L12 16.2l3.85-3.85" fill="none" stroke="#111" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span>94% Faster Emergency Response Time</span>
+          </div>
+
+          {/* Stat 3: Accredited Hospitals */}
+          <div
+            className="stat appear appear--stat"
+            style={{ ["--d" as any]: "1.44s" }}
+          >
+            <svg className="stat-icon-wide" viewBox="0 0 40 22">
+              <circle cx="10.2" cy="11" r="9.2" fill="#2b2b2b" />
+              <ellipse cx="10.2" cy="12.1" rx="4.15" ry="3.7" fill="#f4f4f4" />
+              <circle cx="8.6" cy="11.2" r="0.7" fill="#1a1a1a" />
+              <circle cx="11.8" cy="11.2" r="0.7" fill="#1a1a1a" />
+
+              <circle cx="20.2" cy="11" r="9.2" fill="#ffffff" />
+              <circle cx="18.2" cy="9.8" r="1.7" fill="#111111" />
+              <circle cx="22.2" cy="9.8" r="1.7" fill="#111111" />
+              <path d="M18.8 14.5c.8.8 2 .8 2.8 0" fill="none" stroke="#111" strokeWidth="1.2" strokeLinecap="round" />
+
+              <circle cx="30.2" cy="11" r="9.2" fill="#ef4444" />
+              <text x="30.2" y="15.1" fill="#ffffff" fontSize="11" fontWeight="700" textAnchor="middle" fontFamily="Inter, sans-serif">+</text>
+            </svg>
+            <span>250+ Accredited Hospitals & Organ Centers</span>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
