@@ -1,9 +1,12 @@
 "use client"
 
-import { SignInButton, SignUpButton } from "@clerk/nextjs"
-import { Heart, Building2, Shield, ArrowRight, Sparkles } from "lucide-react"
+import { useUser, useClerk, SignInButton, SignUpButton, SignOutButton } from "@clerk/nextjs"
+import { Heart, Building2, Shield, ArrowRight, Sparkles, LogOut, CheckCircle2, User } from "lucide-react"
+import Link from "next/link"
 
 export default function AuthPage() {
+    const { isLoaded, isSignedIn, user } = useUser()
+
     const roles = [
         {
             id: "donor",
@@ -43,7 +46,7 @@ export default function AuthPage() {
     return (
         <div className="min-h-screen w-full bg-black relative flex flex-col items-center justify-center p-4 antialiased overflow-hidden">
             <div className="z-10 w-full max-w-5xl">
-                <div className="text-center mb-12">
+                <div className="text-center mb-8">
                     <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold text-primary mb-3">
                         <Sparkles className="w-3.5 h-3.5" />
                         AI-Powered Healthcare Trust Network
@@ -52,8 +55,22 @@ export default function AuthPage() {
                         Welcome to VeinLink
                     </h1>
                     <p className="text-neutral-400 max-w-lg mx-auto text-sm sm:text-base">
-                        Connecting donors with transplant centers to save lives. Authenticate with Clerk to get started.
+                        Connecting donors with transplant centers to save lives.
                     </p>
+
+                    {/* Active session bar if signed in */}
+                    {isLoaded && isSignedIn && user && (
+                        <div className="mt-5 inline-flex flex-wrap items-center justify-center gap-3 p-3 rounded-2xl bg-zinc-900/80 border border-zinc-800 text-xs">
+                            <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                                <CheckCircle2 className="w-4 h-4" /> Signed in as: <strong className="text-white">{user.fullName || user.primaryEmailAddress?.emailAddress}</strong>
+                            </span>
+                            <SignOutButton>
+                                <button className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 font-semibold px-2 py-1 rounded-lg hover:bg-red-500/10 transition-colors">
+                                    <LogOut className="w-3.5 h-3.5" /> Sign Out
+                                </button>
+                            </SignOutButton>
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
@@ -72,16 +89,27 @@ export default function AuthPage() {
                             </p>
 
                             <div className="flex flex-col w-full gap-3">
-                                <SignInButton mode="modal" forceRedirectUrl={role.redirectUrl}>
-                                    <button className="w-full py-2.5 px-4 rounded-xl bg-white text-black font-semibold hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
-                                        Login as {role.title}
-                                    </button>
-                                </SignInButton>
-                                <SignUpButton mode="modal" forceRedirectUrl={role.redirectUrl}>
-                                    <button className="w-full py-2.5 px-4 rounded-xl border border-zinc-800 text-white font-medium hover:bg-zinc-900 transition-colors text-sm">
-                                        Sign Up as {role.title}
-                                    </button>
-                                </SignUpButton>
+                                {isLoaded && isSignedIn ? (
+                                    <Link
+                                        href={role.redirectUrl}
+                                        className="w-full py-2.5 px-4 rounded-xl bg-white text-black font-semibold hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 shadow-sm text-sm"
+                                    >
+                                        Go to {role.title} Dashboard <ArrowRight className="w-4 h-4" />
+                                    </Link>
+                                ) : (
+                                    <>
+                                        <SignInButton mode="modal" forceRedirectUrl={role.redirectUrl}>
+                                            <button className="w-full py-2.5 px-4 rounded-xl bg-white text-black font-semibold hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 shadow-sm text-sm">
+                                                Login as {role.title}
+                                            </button>
+                                        </SignInButton>
+                                        <SignUpButton mode="modal" forceRedirectUrl={role.redirectUrl}>
+                                            <button className="w-full py-2.5 px-4 rounded-xl border border-zinc-800 text-white font-medium hover:bg-zinc-900 transition-colors text-sm">
+                                                Sign Up as {role.title}
+                                            </button>
+                                        </SignUpButton>
+                                    </>
+                                )}
                             </div>
                         </div>
                     ))}
