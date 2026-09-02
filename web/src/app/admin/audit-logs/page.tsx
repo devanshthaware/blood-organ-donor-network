@@ -101,9 +101,7 @@ export default function AdminAuditLogsPage() {
                                     <TableCell>
                                         {log.timestamp instanceof Date
                                             ? log.timestamp.toLocaleString()
-                                            : typeof log.timestamp === "object" && "toDate" in log.timestamp
-                                                ? log.timestamp.toDate().toLocaleString()
-                                                : "Unknown"}
+                                            : new Date(log.timestamp as any).toLocaleString()}
                                     </TableCell>
                                 </TableRow>
                             ))

@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState, use } from "react"
+import { useState, use } from "react"
 import { useRouter } from "next/navigation"
-import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, getDocs } from "firebase/firestore"
-import { db, auth } from "@/lib/firebase"
+import { useQuery, useMutation } from "convex/react"
+import { api } from "../../../../../convex/_generated/api"
+import { useAuth } from "@/hooks/useAuth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,48 +19,17 @@ interface PageProps {
     }>
 }
 
-interface HospitalData {
-    name: string
-    address: string | { full?: string, street?: string, city?: string, state?: string, pincode?: string }
-    blood_groups_supported: string[]
-    email?: string
-    phoneNumber?: string
-}
-
 export default function SchedulePage({ params }: PageProps) {
     const router = useRouter()
     const { hospitalId } = use(params)
+    const { user } = useAuth()
     const { request: pendingCheckup, loading: checkupLoading } = useCheckupRequests()
 
-    const [hospital, setHospital] = useState<HospitalData | null>(null)
-    const [loading, setLoading] = useState(true)
+    const hospital = useQuery(api.hospitals.getHospitalById, { hospitalId: hospitalId as any })
+    const createCheckupMutation = useMutation(api.checkups.createCheckupRequest)
+
     const [bookingDate, setBookingDate] = useState("")
     const [processing, setProcessing] = useState(false)
-
-    useEffect(() => {
-        const fetchHospital = async () => {
-            try {
-                const docRef = doc(db, "hospitals", hospitalId)
-                const docSnap = await getDoc(docRef)
-
-                if (docSnap.exists) {
-                    setHospital(docSnap.data() as HospitalData)
-                } else {
-                    toast.error("Hospital not found")
-                    router.push("/donor/map")
-                }
-            } catch (error) {
-                console.error("Error fetching hospital:", error)
-                toast.error("Failed to load hospital details")
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        if (hospitalId) {
-            fetchHospital()
-        }
-    }, [hospitalId, router])
 
     const handleConfirmBooking = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -68,40 +38,25 @@ export default function SchedulePage({ params }: PageProps) {
             return
         }
 
+        if (!user) {
+            toast.error("You must be logged in")
+            router.push("/auth")
+            return
+        }
+
         setProcessing(true)
         try {
-            const user = auth.currentUser
-            if (!user) {
-                toast.error("You must be logged in")
-                router.push("/login")
-                return
-            }
-
-            // Check if user already has a pending request
-            const existingQ = query(
-                collection(db, "checkup_requests"),
-                where("donorId", "==", user.uid),
-                where("status", "==", "REQUESTED")
-            )
-            const existingDocs = await getDocs(existingQ)
-
-            if (!existingDocs.empty) {
-                toast.error("You already have a pending checkup request")
-                return
-            }
-
-            const scheduledAt = new Date(bookingDate)
-
-            await addDoc(collection(db, "checkup_requests"), {
+            await createCheckupMutation({
+                hospitalId,
+                hospitalName: hospital?.name || "Medical Facility",
                 donorId: user.uid,
-                hospitalId: hospitalId,
-                status: "REQUESTED",
-                requestedAt: serverTimestamp(),
-                scheduledAt: scheduledAt
+                donorName: user.displayName || "Donor",
+                date: bookingDate.split("T")[0] || bookingDate,
+                timeSlot: bookingDate.split("T")[1] || "10:00 AM",
             })
 
             toast.success("Checkup scheduled successfully!")
-            router.push("/donor/dashboard") // Or redirect to a success/confirmation page
+            router.push("/donor/dashboard")
         } catch (error) {
             console.error("Error requesting checkup:", error)
             toast.error("Failed to submit request")
@@ -110,7 +65,7 @@ export default function SchedulePage({ params }: PageProps) {
         }
     }
 
-    if (loading || checkupLoading) {
+    if (hospital === undefined || checkupLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-neutral-900">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
@@ -118,9 +73,15 @@ export default function SchedulePage({ params }: PageProps) {
         )
     }
 
-    if (!hospital) return null
+    if (!hospital) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-neutral-900 p-4">
+                <p className="text-muted-foreground mb-4">Hospital not found</p>
+                <Button onClick={() => router.push("/donor/map")}>Back to Map</Button>
+            </div>
+        )
+    }
 
-    // If there is already a pending checkup request, show that instead of the form
     if (pendingCheckup) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-neutral-900 p-4 md:p-8">
@@ -165,15 +126,7 @@ export default function SchedulePage({ params }: PageProps) {
         )
     }
 
-    // Helper to format address
-    const getAddressString = (addr: any) => {
-        if (typeof addr === "string") return addr
-        if (typeof addr === "object") {
-            if (addr.full) return addr.full
-            return `${addr.street || ""}, ${addr.city || ""}, ${addr.state || ""} ${addr.pincode || ""}`.replace(/^, /, "").replace(/, $/, "")
-        }
-        return "Address not available"
-    }
+    const bloodGroups = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"]
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-neutral-900 p-4 md:p-8">
@@ -213,7 +166,7 @@ export default function SchedulePage({ params }: PageProps) {
                                     Location
                                 </h3>
                                 <p className="text-sm text-muted-foreground leading-relaxed">
-                                    {getAddressString(hospital.address)}
+                                    {hospital.address}
                                 </p>
                             </div>
 
@@ -222,7 +175,7 @@ export default function SchedulePage({ params }: PageProps) {
                                     Supported Blood Groups
                                 </h3>
                                 <div className="flex flex-wrap gap-2">
-                                    {hospital.blood_groups_supported?.map((group) => (
+                                    {bloodGroups.map((group) => (
                                         <Badge key={group} variant="secondary" className="bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-300">
                                             {group}
                                         </Badge>

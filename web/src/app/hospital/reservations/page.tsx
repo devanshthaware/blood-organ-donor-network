@@ -11,44 +11,18 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useReservations } from "@/hooks/useReservations"
-import { getAuthToken } from "@/lib/auth-helpers"
 import { useState } from "react"
 import { CheckCircle2 } from "lucide-react"
 
 export default function HospitalReservationsPage() {
-    const { reservations, loading } = useReservations("hospital")
+    const { reservations, loading, completeReservation } = useReservations("hospital")
     const [processing, setProcessing] = useState<string | null>(null)
 
     const handleComplete = async (reservationId: string) => {
         setProcessing(reservationId)
         try {
-            const token = await getAuthToken(true)
-            if (!token) {
-                alert("Please log in")
-                setProcessing(null)
-                return
-            }
-
-            const response = await fetch(`/api/reservations/${reservationId}/complete`, {
-                method: "PATCH",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: "Unknown error occurred" }))
-                const errorMessage = errorData.error || `Failed to complete reservation (${response.status})`
-                alert(errorMessage)
-                setProcessing(null)
-                return
-            }
-
-            const result = await response.json()
-            alert(result.message || "Reservation marked as completed successfully")
-
-            // The reservations list will update automatically via Firestore real-time listener
+            await completeReservation(reservationId)
+            alert("Reservation marked as completed successfully")
         } catch (error: any) {
             console.error("Error completing reservation:", error)
             alert(error?.message || "An unexpected error occurred. Please try again.")

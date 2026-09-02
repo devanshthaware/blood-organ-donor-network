@@ -3,8 +3,7 @@
 import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
-import { signOut } from "firebase/auth"
-import { auth } from "@/lib/firebase"
+import { useClerk } from "@clerk/nextjs"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -45,12 +44,13 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Sidebar({ role, className }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
+    const { signOut } = useClerk()
     const currentRoutes = routes[role]
 
     const handleLogout = async () => {
         try {
-            await signOut(auth)
-            router.push("/login")
+            await signOut()
+            router.push("/auth")
         } catch (error) {
             console.error("Logout error:", error)
         }

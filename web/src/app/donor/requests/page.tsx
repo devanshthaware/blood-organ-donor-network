@@ -15,52 +15,28 @@ import { useDonationRequests } from "@/hooks/useDonationRequests"
 import { useDonorProfile } from "@/hooks/useUserProfile"
 import { useReservations } from "@/hooks/useReservations"
 import { useCheckupRequests } from "@/hooks/useCheckupRequests"
-import { getAuthToken } from "@/lib/auth-helpers"
 import { useState } from "react"
 
 export default function DonorRequestsPage() {
     const { requests: openRequests, loading } = useDonationRequests("donor")
     const { profile, loading: profileLoading } = useDonorProfile()
-    const { reservations: myResponses, loading: responsesLoading } = useReservations("donor")
+    const { reservations: myResponses, loading: responsesLoading, acceptReservation, declineReservation } = useReservations("donor")
     const { request: pendingCheckup, loading: checkupLoading } = useCheckupRequests()
     const [processing, setProcessing] = useState<string | null>(null)
 
     const handleAction = async (requestId: string, action: "accept" | "reject") => {
         setProcessing(requestId)
         try {
-            const token = await getAuthToken(true)
-            if (!token) {
-                alert("Please log in")
-                setProcessing(null)
-                return
+            const res = myResponses.find((r) => r.requestId === requestId || r.id === requestId)
+            if (res) {
+                if (action === "accept") {
+                    await acceptReservation(res.id)
+                } else {
+                    await declineReservation(res.id)
+                }
             }
-
-            const response = await fetch(`/api/requests/${requestId}/respond`, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ action }),
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: "Unknown error occurred" }))
-                const errorMessage = errorData.error || `Failed to ${action} request (${response.status})`
-                console.error("API error:", errorMessage)
-                // Error will be handled by the real-time listener or user can retry
-                setProcessing(null)
-                return
-            }
-
-            const result = await response.json()
-            console.log("Request action successful:", result.message || `Request ${action === "accepted" ? "accepted" : "rejected"}`)
-
-            // The requests list will update automatically via Firestore real-time listener
-            // No need for manual state update - Firestore listener handles it
         } catch (error: any) {
             console.error("Error processing request:", error)
-            // Error is logged - UI will reflect database state via real-time listener
         } finally {
             setProcessing(null)
         }

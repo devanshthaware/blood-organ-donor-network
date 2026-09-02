@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react"
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 import "leaflet/dist/leaflet.css"
-// import { addDoc, collection, query, serverTimestamp, where, getDocs } from "firebase/firestore"
-// import { db, auth } from "@/lib/firebase"
+
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
@@ -17,8 +16,7 @@ import { type Hospital } from "@/lib/hospital-data" // Keep type for now or refa
 import { createHospitalIcon, getDefaultIcon } from "@/components/ui/hospital-icon"
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM } from "@/data/demo-hospitals"
 
-// Use custom hospital icon with fallback
-let hospitalIcon
+let hospitalIcon: any = null
 try {
     hospitalIcon = createHospitalIcon()
 } catch (error) {

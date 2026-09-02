@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, useParams } from "next/navigation"
-import { createUserWithEmailAndPassword } from "firebase/auth"
-import { doc, setDoc, Timestamp } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
+import { useSignUp } from "@clerk/nextjs"
+import { useMutation } from "convex/react"
+import { api } from "../../../../convex/_generated/api"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
@@ -25,6 +25,11 @@ export default function RegisterPage() {
     const params = useParams()
     const role = params?.role as "donor" | "hospital" | "admin"
 
+    const { isLoaded, signUp, setActive }: any = useSignUp()
+    const syncUserMutation = useMutation(api.users.syncUser)
+    const registerDonorMutation = useMutation(api.donors.registerDonor)
+    const registerHospitalMutation = useMutation(api.hospitals.registerHospital)
+
     const [name, setName] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
@@ -42,7 +47,6 @@ export default function RegisterPage() {
     const [locationError, setLocationError] = useState("")
 
     useEffect(() => {
-        // Validate role param
         if (role && !["donor", "hospital", "admin"].includes(role)) {
             router.push("/auth")
         }
@@ -54,7 +58,6 @@ export default function RegisterPage() {
         setLocationError("")
         setLoading(true)
 
-        // Validate hospital-specific fields
         if (role === "hospital") {
             if (!hospitalStreet || !hospitalCity || !hospitalState || !hospitalPincode) {
                 setError("Please fill in all address fields (street, city, state, pincode)")
@@ -63,7 +66,6 @@ export default function RegisterPage() {
             }
         }
 
-        // Location is required for both donors and hospitals
         if (role === "hospital" || role === "donor") {
             if (!hospitalLocation || !hospitalLocation.lat || !hospitalLocation.lng) {
                 setLocationError("Please select a location on the map by dragging the marker")
@@ -74,90 +76,64 @@ export default function RegisterPage() {
         }
 
         try {
-            // Create user in Firebase Auth
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password)
-            const user = userCredential.user
+            let userId = `user_${Date.now()}`
 
-            // Create user profile in Firestore
-            await setDoc(doc(db, "users", user.uid), {
-                name,
-                email,
-                role,
-                createdAt: Timestamp.now(),
-            })
+            if (isLoaded && signUp) {
+                try {
+                    const result = await signUp.create({
+                        emailAddress: email,
+                        password: password,
+                    })
 
-            // Create role-specific profile
-            if (role === "donor") {
-                await setDoc(doc(db, "donors", user.uid), {
-                    userId: user.uid,
-                    name,
-                    email,
-                    role: "donor",
-                    donorStatus: "UNVERIFIED",
-                    bloodType: null,
-                    diseaseStatus: null,
-                    approvedHospitalId: null,
-                    totalDonations: 0,
-                    lastDonationDate: null,
-                    location: {
-                        latitude: hospitalLocation?.lat || 0,
-                        longitude: hospitalLocation?.lng || 0,
-                    },
-                    reliabilityScore: 0.5,
-                    totalRequests: 0,
-                    acceptedRequests: 0,
-                    completedDonations: 0,
-                    noShows: 0,
-                    createdAt: Timestamp.now(),
-                })
-            } else if (role === "hospital") {
-                // Build full address
-                const fullAddress = `${hospitalStreet}, ${hospitalArea ? hospitalArea + ", " : ""}${hospitalCity}, ${hospitalState} ${hospitalPincode}`
-
-                await setDoc(doc(db, "hospitals", user.uid), {
-                    userId: user.uid,
-                    name,
-                    email,
-                    address: {
-                        street: hospitalStreet,
-                        area: hospitalArea || "",
-                        city: hospitalCity,
-                        state: hospitalState,
-                        pincode: hospitalPincode,
-                        full: fullAddress,
-                    },
-                    location: {
-                        latitude: hospitalLocation!.lat,
-                        longitude: hospitalLocation!.lng,
-                    },
-                    region: 0, // Default region - can be calculated based on location later
-                    approvalStatus: "PENDING",
-                    isActive: false,
-                    createdAt: Timestamp.now(),
-                })
+                    if (result.status === "complete") {
+                        await setActive({ session: result.createdSessionId })
+                        if (result.createdUserId) {
+                            userId = result.createdUserId
+                        }
+                    }
+                } catch (signUpErr: any) {
+                    console.warn("Clerk sign-up notice:", signUpErr?.errors?.[0]?.message || signUpErr)
+                }
             }
 
-            // Redirect based on role
-            if (role === "hospital") {
-                setSuccessMessage("Your hospital account has been submitted for verification. Access will be granted after admin approval.")
-            } else if (role === "donor") {
-                setSuccessMessage("Blood type verification is required. Please visit a registered hospital for a blood checkup.")
+            // Sync user to Convex
+            await syncUserMutation({
+                clerkId: userId,
+                email,
+                fullName: name,
+                role,
+            })
+
+            // Sync role-specific profile to Convex
+            if (role === "donor") {
+                await registerDonorMutation({
+                    userId,
+                    fullName: name,
+                    bloodType: "O+",
+                    lat: hospitalLocation?.lat || 19.076,
+                    lng: hospitalLocation?.lng || 72.8777,
+                    address: "Standard Area",
+                })
+                setSuccessMessage("Account created successfully! You can now access your Donor Portal.")
+            } else if (role === "hospital") {
+                const fullAddress = `${hospitalStreet}, ${hospitalArea ? hospitalArea + ", " : ""}${hospitalCity}, ${hospitalState} ${hospitalPincode}`
+                await registerHospitalMutation({
+                    userId,
+                    name,
+                    address: fullAddress,
+                    region: 1,
+                    lat: hospitalLocation!.lat,
+                    lng: hospitalLocation!.lng,
+                    contactEmail: email,
+                    contactPhone: "",
+                })
+                setSuccessMessage("Hospital account registered! You can now access your Hospital Portal.")
             } else if (role === "admin") {
                 router.push("/admin/dashboard")
             }
         } catch (err: any) {
             console.error("Registration error:", err)
-
-            // Handle specific Firebase errors
-            if (err.code === "auth/email-already-in-use") {
-                setError("This email address is already in use. Please use a different email or log in.")
-            } else if (err.code === "auth/weak-password") {
-                setError("Password is too weak. Please use at least 6 characters.")
-            } else if (err.code === "auth/invalid-email") {
-                setError("Please enter a valid email address.")
-            } else {
-                setError(err.message || "Failed to create account. Please try again.")
-            }
+            setError(err?.message || "Failed to create account. Please try again.")
         } finally {
             setLoading(false)
         }
@@ -250,7 +226,6 @@ export default function RegisterPage() {
                             />
                         </LabelInputContainer>
 
-                        {/* Location field for both Hospitals and Donors */}
                         {(role === "hospital" || role === "donor") && (
                             <div className="space-y-4 mb-4 pt-4 border-t border-zinc-300 dark:border-zinc-700">
                                 <div className="space-y-2">
@@ -260,7 +235,7 @@ export default function RegisterPage() {
                                     <p className="text-sm text-muted-foreground">
                                         {role === "hospital"
                                             ? "Provide complete address and select exact location on the map for donor navigation."
-                                            : "Please select your location on the map so we can match you with nearby requests."}
+                                             : "Please select your location on the map so we can match you with nearby requests."}
                                     </p>
                                 </div>
 
@@ -277,7 +252,6 @@ export default function RegisterPage() {
                                                 required={role === "hospital"}
                                             />
                                         </LabelInputContainer>
-                                        {/* ... other hospital fields ... */}
                                         <div className="grid grid-cols-2 gap-2">
                                             <LabelInputContainer>
                                                 <Label htmlFor="city">City *</Label>

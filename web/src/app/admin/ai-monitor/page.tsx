@@ -16,9 +16,7 @@ export default function AdminAIMonitorPage() {
     const formatAIEvent = (event: typeof events[0]) => {
         const time = event.createdAt instanceof Date
             ? event.createdAt.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-            : typeof event.createdAt === 'object' && 'toDate' in event.createdAt
-                ? event.createdAt.toDate().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            : new Date(event.createdAt as any).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
         let message = "";
         let severity: "Info" | "Success" | "Medium" | "Error" = event.status === "FAILED" ? "Error" : "Info";

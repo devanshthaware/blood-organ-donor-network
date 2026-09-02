@@ -12,39 +12,25 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Check, X, CheckCircle2 } from "lucide-react"
-import { getAuthToken } from "@/lib/auth-helpers"
 import { useState } from "react"
 
 export default function DonorAvailabilityPage() {
-    const { reservations, loading } = useReservations("donor")
+    const {
+        reservations,
+        loading,
+        acceptReservation,
+        declineReservation,
+        completeReservation,
+    } = useReservations("donor")
     const [processing, setProcessing] = useState<string | null>(null)
 
     const handleAccept = async (reservationId: string) => {
         setProcessing(reservationId)
         try {
-            const token = await getAuthToken()
-            if (!token) {
-                alert("Please log in")
-                return
-            }
-
-            const response = await fetch(`/api/reservations/${reservationId}/accept`, {
-                method: "PATCH",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-            })
-
-            if (!response.ok) {
-                const error = await response.json()
-                alert(error.error || "Failed to accept reservation")
-                return
-            }
-
-            // UI will update automatically via Firestore listener
-        } catch (error) {
-            alert("Failed to accept reservation. Please try again.")
+            await acceptReservation(reservationId)
+            alert("Reservation accepted successfully!")
+        } catch (error: any) {
+            alert(error?.message || "Failed to accept reservation. Please try again.")
         } finally {
             setProcessing(null)
         }
@@ -53,27 +39,10 @@ export default function DonorAvailabilityPage() {
     const handleDecline = async (reservationId: string) => {
         setProcessing(reservationId)
         try {
-            const token = await getAuthToken()
-            if (!token) {
-                alert("Please log in")
-                return
-            }
-
-            const response = await fetch(`/api/reservations/${reservationId}/decline`, {
-                method: "PATCH",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-            })
-
-            if (!response.ok) {
-                const error = await response.json()
-                alert(error.error || "Failed to decline reservation")
-                return
-            }
-        } catch (error) {
-            alert("Failed to decline reservation. Please try again.")
+            await declineReservation(reservationId)
+            alert("Reservation declined.")
+        } catch (error: any) {
+            alert(error?.message || "Failed to decline reservation. Please try again.")
         } finally {
             setProcessing(null)
         }
@@ -82,36 +51,10 @@ export default function DonorAvailabilityPage() {
     const handleComplete = async (reservationId: string) => {
         setProcessing(reservationId)
         try {
-            const token = await getAuthToken(true)
-            if (!token) {
-                alert("Please log in")
-                setProcessing(null)
-                return
-            }
-
-            const response = await fetch(`/api/reservations/${reservationId}/complete`, {
-                method: "PATCH",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: "Unknown error occurred" }))
-                const errorMessage = errorData.error || `Failed to complete reservation (${response.status})`
-                alert(errorMessage)
-                setProcessing(null)
-                return
-            }
-
-            const result = await response.json()
-            alert(result.message || "Reservation marked as completed successfully")
-            
-            // The reservations list will update automatically via Firestore real-time listener
+            await completeReservation(reservationId)
+            alert("Donation marked as complete!")
         } catch (error: any) {
-            console.error("Error completing reservation:", error)
-            alert(error?.message || "An unexpected error occurred. Please try again.")
+            alert(error?.message || "Failed to complete reservation. Please try again.")
         } finally {
             setProcessing(null)
         }

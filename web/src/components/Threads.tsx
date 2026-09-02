@@ -124,7 +124,7 @@ void main() {
 }
 `;
 
-interface ThreadsProps extends HTMLAttributes<HTMLDivElement> {
+interface ThreadsProps extends Omit<HTMLAttributes<HTMLDivElement>, "color"> {
     color?: [number, number, number];
     amplitude?: number;
     distance?: number;
@@ -139,7 +139,7 @@ const Threads: React.FC<ThreadsProps> = ({
     ...rest
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const animationFrameId = useRef<number>();
+    const animationFrameId = useRef<number>(0);
 
     useEffect(() => {
         if (!containerRef.current) return;

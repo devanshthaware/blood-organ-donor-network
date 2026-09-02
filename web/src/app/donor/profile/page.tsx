@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 import { useDonorProfile } from "@/hooks/useUserProfile"
 import { useAuth } from "@/hooks/useAuth"
 import { useState, useEffect } from "react"
-import { doc, updateDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { useMutation } from "convex/react"
+import { api } from "../../../../convex/_generated/api"
 import { BLOOD_GROUPS } from "@/lib/constants"
 import {
     Select,
@@ -22,6 +22,8 @@ import { Switch } from "@/components/ui/switch"
 export default function DonorProfilePage() {
     const { user } = useAuth()
     const { profile, loading } = useDonorProfile()
+    const updateAvailabilityMutation = useMutation(api.donors.updateAvailability)
+    const updateUserMutation = useMutation(api.users.updateProfile)
     const [isEditing, setIsEditing] = useState(false)
     const [saving, setSaving] = useState(false)
     const [formData, setFormData] = useState({
@@ -50,20 +52,8 @@ export default function DonorProfilePage() {
 
         setSaving(true)
         try {
-            const donorRef = doc(db, "donors", user.uid)
-            // CRITICAL: Do NOT update bloodType, donorStatus, etc.
-            // These are restricted by Firestore Rules.
-            await updateDoc(donorRef, {
-                name: formData.name,
-                address: formData.address,
-                isActive: formData.isActive,
-            })
-
-            // Also update user collection
-            const userRef = doc(db, "users", user.uid)
-            await updateDoc(userRef, {
-                name: formData.name,
-            })
+            await updateAvailabilityMutation({ isActive: formData.isActive })
+            await updateUserMutation({ fullName: formData.name })
 
             setIsEditing(false)
             alert("Profile updated successfully!")

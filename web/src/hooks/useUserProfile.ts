@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useAuth } from "@/hooks/useAuth";
 
 export interface DonorProfile {
   userId: string;
+  fullName?: string;
   name?: string;
   email?: string;
   bloodType?: string;
@@ -28,87 +28,68 @@ export interface HospitalProfile {
   name?: string;
   email?: string;
   region?: number;
+  address?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   createdAt?: Date;
 }
 
 export function useDonorProfile() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<DonorProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const donorData = useQuery(
+    api.donors.getDonorProfile,
+    user?.uid ? { userId: user.uid } : "skip"
+  );
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onSnapshot(
-      doc(db, "donors", user.uid),
-      (docSnapshot) => {
-        if (docSnapshot.exists()) {
-          const data = docSnapshot.data();
-          setProfile({
-            userId: user.uid,
-            ...data,
-            lastDonationDate: data.lastDonationDate?.toDate() || null,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            reliabilityUpdatedAt: data.reliabilityUpdatedAt?.toDate() || null,
-          } as DonorProfile);
-        } else {
-          setProfile(null);
-        }
-        setLoading(false);
-      },
-      (err) => {
-        const error = err instanceof Error ? err : new Error(String(err));
-        setError(error);
-        setLoading(false);
+  const profile: DonorProfile | null = donorData
+    ? {
+        userId: donorData.userId,
+        fullName: donorData.fullName,
+        name: donorData.fullName,
+        bloodType: donorData.bloodType,
+        completedDonations: donorData.completedDonations,
+        totalDonations: donorData.completedDonations,
+        lastDonationDate: donorData.lastDonationDate
+          ? new Date(donorData.lastDonationDate)
+          : null,
+        isActive: donorData.isActive,
+        createdAt: new Date(donorData.createdAt),
+        reliabilityScore: donorData.reliabilityScore,
+        donorStatus: donorData.donorStatus,
+        address: donorData.address,
       }
-    );
+    : null;
 
-    return () => unsubscribe();
-  }, [user]);
-
-  return { profile, loading, error };
+  return {
+    profile,
+    loading: donorData === undefined,
+    error: null,
+  };
 }
 
 export function useHospitalProfile() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<HospitalProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const hospData = useQuery(
+    api.hospitals.getHospitalProfile,
+    user?.uid ? { userId: user.uid } : "skip"
+  );
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onSnapshot(
-      doc(db, "hospitals", user.uid),
-      (docSnapshot) => {
-        if (docSnapshot.exists()) {
-          const data = docSnapshot.data();
-          setProfile({
-            userId: user.uid,
-            ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-          } as HospitalProfile);
-        } else {
-          setProfile(null);
-        }
-        setLoading(false);
-      },
-      (err) => {
-        const error = err instanceof Error ? err : new Error(String(err));
-        setError(error);
-        setLoading(false);
+  const profile: HospitalProfile | null = hospData
+    ? {
+        userId: hospData.userId,
+        name: hospData.name,
+        address: hospData.address,
+        contactEmail: hospData.contactEmail,
+        contactPhone: hospData.contactPhone,
+        email: hospData.contactEmail,
+        region: hospData.region,
+        createdAt: new Date(hospData.createdAt),
       }
-    );
+    : null;
 
-    return () => unsubscribe();
-  }, [user]);
-
-  return { profile, loading, error };
+  return {
+    profile,
+    loading: hospData === undefined,
+    error: null,
+  };
 }

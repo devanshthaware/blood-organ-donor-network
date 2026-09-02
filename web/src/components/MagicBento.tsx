@@ -521,7 +521,7 @@ const MagicBento = ({
                     // Construct CSS class string
                     const baseClassName = `magic-bento-card ${textAutoHide ? 'magic-bento-card--text-autohide' : ''} ${enableBorderGlow ? 'magic-bento-card--border-glow' : ''}`;
 
-                    const cardStyle: React.CSSProperties & { [key: string]: string } = {
+                    const cardStyle: any = {
                         backgroundColor: card.color || '#060010',
                         '--glow-color': glowColor,
                         gridColumn: card.colSpan ? `span ${card.colSpan}` : undefined,

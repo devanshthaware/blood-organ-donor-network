@@ -1,68 +1,43 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { collection, query, where, onSnapshot, orderBy, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 
 export interface Alert {
   id: string;
   type: string;
   severity: string;
-  bloodGroup: string;
+  bloodGroup?: string;
+  bloodType?: string;
   title: string;
   message: string;
   confidence?: number;
   recommendedActions?: string[];
   area?: string;
   region?: number;
-  createdAt: Date | Timestamp;
-  acknowledgedAt?: Date | Timestamp;
+  createdAt: Date;
+  acknowledgedAt?: Date;
 }
 
 export function useAlerts() {
-  const { user } = useAuth();
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const alertsData = useQuery(api.alerts.getAlerts, {});
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+  const alerts: Alert[] = (alertsData || []).map((a: any) => ({
+    id: a._id,
+    type: a.type,
+    severity: a.severity,
+    bloodGroup: a.bloodType,
+    bloodType: a.bloodType,
+    title: a.title,
+    message: a.message,
+    createdAt: new Date(a.createdAt),
+    acknowledgedAt: a.resolvedAt ? new Date(a.resolvedAt) : undefined,
+  }));
 
-    // Hospitals and admins can see alerts
-    const q = query(
-      collection(db, "alerts"),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data: Alert[] = [];
-        snapshot.forEach((doc) => {
-          const docData = doc.data();
-          data.push({
-            id: doc.id,
-            ...docData,
-            createdAt: docData.createdAt?.toDate() || new Date(),
-            acknowledgedAt: docData.acknowledgedAt?.toDate(),
-          } as Alert);
-        });
-        setAlerts(data);
-        setLoading(false);
-      },
-      (err) => {
-        const error = err instanceof Error ? err : new Error(String(err));
-        setError(error);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user]);
-
-  return { alerts, loading, error };
+  return {
+    alerts,
+    loading: alertsData === undefined,
+    error: null,
+  };
 }
+export default useAlerts;

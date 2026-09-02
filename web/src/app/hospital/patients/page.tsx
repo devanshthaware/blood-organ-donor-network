@@ -12,7 +12,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2 } from "lucide-react"
 import { usePatients } from "@/hooks/usePatients"
-import { getAuthToken } from "@/lib/auth-helpers"
+import { useAuth } from "@/hooks/useAuth"
+import { useMutation } from "convex/react"
+import { api } from "../../../../convex/_generated/api"
 import { useState } from "react"
 import {
     Dialog,
@@ -36,7 +38,11 @@ import { Textarea } from "@/components/ui/textarea"
 import { BLOOD_GROUPS, PATIENT_STATUSES } from "@/lib/constants"
 
 export default function HospitalPatientsPage() {
+    const { user } = useAuth()
     const { patients, loading } = usePatients()
+    const createPatientMutation = useMutation(api.patients.createPatient)
+    const deletePatientMutation = useMutation(api.patients.deletePatient)
+
     const [isOpen, setIsOpen] = useState(false)
     const [deleting, setDeleting] = useState<string | null>(null)
     const [submitting, setSubmitting] = useState(false)
@@ -50,36 +56,25 @@ export default function HospitalPatientsPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (!user) {
+            alert("Please log in")
+            return
+        }
+
         setSubmitting(true)
         try {
-            const token = await getAuthToken(true)
-            if (!token) {
-                alert("Please log in")
-                setSubmitting(false)
-                return
-            }
-
-            const response = await fetch("/api/patients/create", {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(formData),
+            await createPatientMutation({
+                hospitalId: user.uid,
+                name: formData.name,
+                age: parseInt(formData.age, 10) || 30,
+                bloodType: formData.bloodGroup || "O+",
+                condition: formData.status,
+                urgency: "MEDIUM",
             })
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: "Unknown error occurred" }))
-                const errorMessage = errorData.error || `Failed to create patient (${response.status})`
-                alert(errorMessage)
-                setSubmitting(false)
-                return
-            }
-
-            const result = await response.json()
             setIsOpen(false)
             setFormData({ name: "", age: "", bloodGroup: "", status: "Stable", notes: "" })
-            alert(result.message || "Patient created successfully")
+            alert("Patient created successfully")
         } catch (error: any) {
             console.error("Error creating patient:", error)
             alert(error?.message || "An unexpected error occurred. Please try again.")
@@ -95,31 +90,8 @@ export default function HospitalPatientsPage() {
 
         setDeleting(patientId)
         try {
-            const token = await getAuthToken(true)
-            if (!token) {
-                alert("Please log in")
-                setDeleting(null)
-                return
-            }
-
-            const response = await fetch(`/api/patients/${patientId}/delete`, {
-                method: "DELETE",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: "Unknown error occurred" }))
-                const errorMessage = errorData.error || `Failed to delete patient (${response.status})`
-                alert(errorMessage)
-                setDeleting(null)
-                return
-            }
-
-            const result = await response.json()
-            alert(result.message || "Patient deleted successfully")
+            await deletePatientMutation({ patientId: patientId as any })
+            alert("Patient deleted successfully")
         } catch (error: any) {
             console.error("Error deleting patient:", error)
             alert(error?.message || "An unexpected error occurred. Please try again.")

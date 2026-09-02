@@ -6,8 +6,7 @@ import { routes } from "@/config/routes"
 import { ModeToggle } from "@/components/mode-toggle"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
-import { signOut } from "firebase/auth"
-import { auth } from "@/lib/firebase"
+import { useClerk } from "@clerk/nextjs"
 import { LogOut, Menu } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
@@ -21,12 +20,13 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children, role }: DashboardLayoutProps) {
     const [open, setOpen] = useState(false)
     const router = useRouter()
+    const { signOut } = useClerk()
     const currentRoutes = routes[role]
 
     const handleLogout = async () => {
         try {
-            await signOut(auth)
-            router.push("/login")
+            await signOut()
+            router.push("/auth")
         } catch (error) {
             console.error("Logout error:", error)
         }

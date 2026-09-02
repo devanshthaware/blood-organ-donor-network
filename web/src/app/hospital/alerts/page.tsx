@@ -6,7 +6,8 @@ import { useAlerts } from "@/hooks/useAlerts"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
-import { getAuthToken } from "@/lib/auth-helpers"
+import { useMutation } from "convex/react"
+import { api } from "../../../../convex/_generated/api"
 import {
     Dialog,
     DialogContent,
@@ -29,6 +30,7 @@ import { BLOOD_GROUPS } from "@/lib/constants"
 
 export default function HospitalAlertsPage() {
     const { alerts, loading } = useAlerts()
+    const createAlertMutation = useMutation(api.alerts.createAlert)
     const [isOpen, setIsOpen] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [formData, setFormData] = useState({
@@ -42,39 +44,17 @@ export default function HospitalAlertsPage() {
         e.preventDefault()
         setSubmitting(true)
         try {
-            const token = await getAuthToken(true)
-            if (!token) {
-                alert("Please log in")
-                setSubmitting(false)
-                return
-            }
-
-            const response = await fetch("/api/shortages/create", {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    area: formData.area,
-                    bloodGroup: formData.bloodGroup,
-                    shortageRisk: formData.shortageRisk,
-                    region: formData.region ? parseInt(formData.region, 10) : undefined,
-                }),
+            await createAlertMutation({
+                type: "SHORTAGE",
+                severity: (formData.shortageRisk as any) || "HIGH",
+                title: `Emergency Shortage: ${formData.bloodGroup}`,
+                message: `Shortage detected in ${formData.area || "regional center"}. Immediate donor replenishment requested.`,
+                bloodType: formData.bloodGroup,
             })
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: "Unknown error occurred" }))
-                const errorMessage = errorData.error || `Failed to create shortage alert (${response.status})`
-                alert(errorMessage)
-                setSubmitting(false)
-                return
-            }
-
-            const result = await response.json()
             setIsOpen(false)
             setFormData({ area: "", bloodGroup: "", shortageRisk: "HIGH", region: "" })
-            alert(result.message || "Emergency shortage alert created successfully")
+            alert("Emergency shortage alert created successfully")
         } catch (error: any) {
             console.error("Error creating shortage alert:", error)
             alert(error?.message || "An unexpected error occurred. Please try again.")

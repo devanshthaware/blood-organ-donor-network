@@ -31,12 +31,11 @@ import {
 } from "@/components/ui/select"
 import { useState } from "react"
 import { useDonationRequests } from "@/hooks/useDonationRequests"
-import { getAuthToken } from "@/lib/auth-helpers"
 import { useAuth } from "@/hooks/useAuth"
 import { BLOOD_GROUPS, URGENCY_LEVELS } from "@/lib/constants"
 
 export default function HospitalRequestsPage() {
-    const { requests, loading } = useDonationRequests("hospital")
+    const { requests, loading, createRequest, cancelRequest } = useDonationRequests("hospital")
     const { user } = useAuth()
     const [isOpen, setIsOpen] = useState(false)
     const [formData, setFormData] = useState({
@@ -54,33 +53,8 @@ export default function HospitalRequestsPage() {
 
         setCancelling(requestId)
         try {
-            const token = await getAuthToken(true)
-            if (!token) {
-                alert("Please log in")
-                setCancelling(null)
-                return
-            }
-
-            const response = await fetch(`/api/requests/${requestId}/cancel`, {
-                method: "PATCH",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: "Unknown error occurred" }))
-                const errorMessage = errorData.error || `Failed to cancel request (${response.status})`
-                alert(errorMessage)
-                setCancelling(null)
-                return
-            }
-
-            const result = await response.json()
-            alert(result.message || "Request cancelled successfully")
-
-            // The requests list will update automatically via Firestore real-time listener
+            await cancelRequest(requestId)
+            alert("Request cancelled successfully")
         } catch (error: any) {
             console.error("Error cancelling request:", error)
             alert(error?.message || "An unexpected error occurred. Please try again.")
@@ -98,39 +72,20 @@ export default function HospitalRequestsPage() {
 
         setSubmitting(true)
         try {
-            // Force refresh token to ensure it's valid
-            const token = await getAuthToken(true)
-            if (!token) {
-                alert("Please log in")
-                setSubmitting(false)
-                return
-            }
-
-            const response = await fetch("/api/requests/create", {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    bloodGroup: formData.type,
-                    quantity: parseInt(formData.quantity, 10),
-                    urgency: formData.urgency,
-                }),
+            await createRequest({
+                bloodGroup: formData.type,
+                quantity: parseInt(formData.quantity, 10),
+                urgency: formData.urgency as any,
             })
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ error: "Unknown error occurred" }))
-                const errorMessage = errorData.error || `Failed to create request (${response.status})`
-                alert(errorMessage)
-                setSubmitting(false)
-                return
-            }
+            alert("Request created successfully!")
 
-            const result = await response.json()
+            setFormData({
+                type: "O+",
+                quantity: "1",
+                urgency: "LOW",
+            })
             setIsOpen(false)
-            setFormData({ type: "", quantity: "", urgency: "" })
-            // Optionally refresh the requests list or show success message
         } catch (error: any) {
             console.error("Error creating request:", error)
             alert(error?.message || "An unexpected error occurred. Please try again.")

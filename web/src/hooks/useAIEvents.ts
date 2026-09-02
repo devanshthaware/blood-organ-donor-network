@@ -1,9 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { collection, query, onSnapshot, orderBy, limit, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useAuth } from "@/hooks/useAuth";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 
 export interface AIEvent {
   id: string;
@@ -12,7 +10,7 @@ export interface AIEvent {
   inputSummary: Record<string, unknown>;
   outputSummary: Record<string, unknown>;
   status: "SUCCESS" | "FAILED";
-  createdAt: Date | Timestamp;
+  createdAt: Date;
   triggerSource?: string;
   requestId?: string;
   reservationId?: string;
@@ -23,59 +21,29 @@ export interface AIEvent {
 }
 
 export function useAIEvents(maxEvents: number = 100) {
-  const { user } = useAuth();
-  const [events, setEvents] = useState<AIEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const eventsData = useQuery(api.aiEvents.getAIEvents, { limit: maxEvents });
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+  const events: AIEvent[] = (eventsData || []).map((e: any) => ({
+    id: e._id,
+    modelName: e.modelName,
+    modelType: e.modelType,
+    inputSummary: e.inputSummary || {},
+    outputSummary: e.outputSummary || {},
+    status: e.status,
+    createdAt: new Date(e.createdAt),
+    triggerSource: e.triggerSource,
+    requestId: e.requestId,
+    reservationId: e.reservationId,
+    executionTimeMs: e.executionTimeMs,
+    modelVersion: e.modelVersion,
+    errorMessage: e.errorMessage,
+    confidence: e.confidence,
+  }));
 
-    // Query AI events ordered by creation time (newest first)
-    const q = query(
-      collection(db, "ai_events"),
-      orderBy("createdAt", "desc"),
-      limit(maxEvents)
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data: AIEvent[] = [];
-        snapshot.forEach((doc) => {
-          const docData = doc.data();
-          data.push({
-            id: doc.id,
-            modelName: docData.modelName || docData.modelType || "unknown",
-            modelType: docData.modelType || "unknown",
-            inputSummary: docData.inputSummary || docData.input || {},
-            outputSummary: docData.outputSummary || docData.output || {},
-            status: docData.status || "SUCCESS",
-            createdAt: docData.createdAt?.toDate() || new Date(),
-            triggerSource: docData.triggerSource,
-            requestId: docData.requestId,
-            reservationId: docData.reservationId,
-            executionTimeMs: docData.executionTimeMs,
-            modelVersion: docData.modelVersion,
-            errorMessage: docData.errorMessage,
-            confidence: docData.confidence,
-          } as AIEvent);
-        });
-        setEvents(data);
-        setLoading(false);
-      },
-      (err) => {
-        const error = err instanceof Error ? err : new Error(String(err));
-        setError(error);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user, maxEvents]);
-
-  return { events, loading, error };
+  return {
+    events,
+    loading: eventsData === undefined,
+    error: null as Error | null,
+  };
 }
+export default useAIEvents;

@@ -7,13 +7,15 @@ import { Button } from "@/components/ui/button"
 import { useHospitalProfile } from "@/hooks/useUserProfile"
 import { useAuth } from "@/hooks/useAuth"
 import { useState, useEffect } from "react"
-import { doc, updateDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { useMutation } from "convex/react"
+import { api } from "../../../../convex/_generated/api"
 import { REGION_MIN, REGION_MAX } from "@/lib/constants"
 
 export default function HospitalProfilePage() {
     const { user } = useAuth()
     const { profile, loading } = useHospitalProfile()
+    const updateHospitalMutation = useMutation(api.hospitals.updateHospitalProfile)
+    const updateUserMutation = useMutation(api.users.updateProfile)
     const [isEditing, setIsEditing] = useState(false)
     const [saving, setSaving] = useState(false)
     const [formData, setFormData] = useState({
@@ -31,7 +33,7 @@ export default function HospitalProfilePage() {
                 name: profile.name || "",
                 email: profile.email || user?.email || "",
                 address: profile.address || "",
-                phoneNumber: profile.phoneNumber || "",
+                phoneNumber: profile.contactPhone || "",
                 region: profile.region || 0,
             })
         }
@@ -42,18 +44,14 @@ export default function HospitalProfilePage() {
 
         setSaving(true)
         try {
-            const hospitalRef = doc(db, "hospitals", user.uid)
-            await updateDoc(hospitalRef, {
+            await updateHospitalMutation({
                 name: formData.name,
                 address: formData.address,
-                phoneNumber: formData.phoneNumber,
-                region: formData.region,
+                contactPhone: formData.phoneNumber,
             })
-
-            // Also update user collection
-            const userRef = doc(db, "users", user.uid)
-            await updateDoc(userRef, {
-                name: formData.name,
+            await updateUserMutation({
+                fullName: formData.name,
+                phoneNumber: formData.phoneNumber,
             })
 
             setIsEditing(false)

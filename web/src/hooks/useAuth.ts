@@ -1,21 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { User, onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { useUser } from "@clerk/nextjs";
+
+export interface AuthUser {
+  uid: string;
+  id: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+}
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoaded } = useUser();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
+  const authUser: AuthUser | null = user
+    ? {
+        uid: user.id,
+        id: user.id,
+        email: user.primaryEmailAddress?.emailAddress || "",
+        displayName: user.fullName || user.username || "",
+        photoURL: user.imageUrl,
+      }
+    : null;
 
-    return () => unsubscribe();
-  }, []);
-
-  return { user, loading };
+  return {
+    user: authUser,
+    loading: !isLoaded,
+    isAuthenticated: !!user,
+  };
 }
+export default useAuth;

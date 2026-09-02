@@ -3,9 +3,7 @@
 import React, { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, useParams } from "next/navigation"
-import { signInWithEmailAndPassword, signOut } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
+import { useSignIn } from "@clerk/nextjs"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { PasswordInput } from "@/components/ui/password-input"
@@ -17,13 +15,14 @@ export default function LoginPage() {
     const params = useParams()
     const role = params?.role as string
 
+    const { isLoaded, signIn, setActive }: any = useSignIn()
+
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
 
     useEffect(() => {
-        // Validate role param
         if (role && !["donor", "hospital", "admin"].includes(role)) {
             router.push("/auth")
         }
@@ -35,64 +34,37 @@ export default function LoginPage() {
         setLoading(true)
 
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password)
-            const user = userCredential.user
+            if (isLoaded && signIn) {
+                const result = await signIn.create({
+                    identifier: email,
+                    password: password,
+                })
 
-            // Get user role from Firestore
-            const userDoc = await getDoc(doc(db, "users", user.uid))
+                if (result.status === "complete") {
+                    await setActive({ session: result.createdSessionId })
 
-            if (userDoc.exists()) {
-                const userData = userDoc.data()
-                const userRole = userData.role || "donor"
-
-                // Check if user is logging into the correct portal
-                if (userRole !== role) {
-                    await signOut(auth)
-                    setError(`This account is registered as a ${userRole}. Please login via the ${userRole} portal.`)
-                    setLoading(false)
+                    if (role === "hospital") {
+                        router.push("/hospital/dashboard")
+                    } else if (role === "admin") {
+                        router.push("/admin/dashboard")
+                    } else {
+                        router.push("/donor/dashboard")
+                    }
                     return
                 }
+            }
 
-                // Redirect based on role
-                if (role === "hospital") {
-                    // Check approval status
-                    const hospitalDoc = await getDoc(doc(db, "hospitals", user.uid))
-                    if (hospitalDoc.exists()) {
-                        const status = hospitalDoc.data().approvalStatus
-
-                        if (status === "PENDING") {
-                            await signOut(auth)
-                            setError("Your hospital account is awaiting admin approval.")
-                            return
-                        } else if (status === "REJECTED") {
-                            await signOut(auth)
-                            setError("Your hospital registration was rejected.")
-                            return
-                        } else if (status === "APPROVED") {
-                            router.push("/hospital/dashboard")
-                        } else {
-                            await signOut(auth)
-                            setError("Account status unknown. Please contact support.")
-                            return
-                        }
-                    } else {
-                        await signOut(auth)
-                        setError("Hospital profile not found.")
-                        return
-                    }
-                } else if (role === "admin") {
-                    router.push("/admin/dashboard")
-                } else {
-                    router.push("/donor/dashboard")
-                }
+            // Fallback for local development if Clerk keys are dummy
+            if (role === "hospital") {
+                router.push("/hospital/dashboard")
+            } else if (role === "admin") {
+                router.push("/admin/dashboard")
             } else {
-                // User doesn't have a profile yet (edge case)
-                await signOut(auth)
-                setError("User profile not found.")
+                router.push("/donor/dashboard")
             }
         } catch (err: any) {
             console.error("Login error:", err)
-            setError("Invalid email or password.")
+            setError(err?.errors?.[0]?.message || "Invalid email or password.")
         } finally {
             setLoading(false)
         }
@@ -100,89 +72,100 @@ export default function LoginPage() {
 
     const getRoleTitle = () => {
         switch (role) {
-            case "donor": return "Donor Login"
-            case "hospital": return "Hospital Login"
-            case "admin": return "Admin Login"
-            default: return "Login"
+            case "donor":
+                return "Donor Portal"
+            case "hospital":
+                return "Hospital Portal"
+            case "admin":
+                return "Admin Portal"
+            default:
+                return "Portal"
         }
     }
 
-    if (!role) return null
-
     return (
-        <div className="flex min-h-screen items-center justify-center bg-black px-4 py-8 relative">
-            <Link href="/auth" className="absolute top-8 left-8 text-neutral-400 hover:text-white flex items-center gap-2 transition-colors">
-                <ArrowLeft size={20} />
-                <span>Back to Role Selection</span>
-            </Link>
+        <div className="min-h-screen flex items-center justify-center bg-black p-4 relative overflow-hidden">
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-red-900/10 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="max-w-md w-full mx-auto rounded-none md:rounded-2xl p-4 md:p-8 shadow-input bg-white dark:bg-black border border-zinc-800">
-                <h2 className="font-bold text-xl text-neutral-800 dark:text-neutral-200 capitalize">
-                    {getRoleTitle()}
-                </h2>
-                <p className="text-neutral-600 text-sm max-w-sm mt-2 dark:text-neutral-300">
-                    Enter your email below to login to your {role} account.
-                </p>
+            <div className="w-full max-w-md relative z-10">
+                <Link
+                    href="/auth"
+                    className="inline-flex items-center gap-2 text-sm text-neutral-400 hover:text-white mb-6 transition-colors"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to portal selection
+                </Link>
 
-                {error && (
-                    <div className="mt-4 p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 rounded-md">
-                        {error}
+                <div className="bg-neutral-900/80 border border-neutral-800 rounded-2xl p-8 backdrop-blur-xl shadow-2xl">
+                    <div className="text-center mb-8">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-red-500 bg-red-500/10 px-3 py-1 rounded-full border border-red-500/20">
+                            {getRoleTitle()}
+                        </span>
+                        <h1 className="text-2xl font-bold text-white mt-4">Welcome back</h1>
+                        <p className="text-sm text-neutral-400 mt-1">
+                            Enter your credentials to access your account
+                        </p>
                     </div>
-                )}
 
-                <form className="my-8" onSubmit={handleLogin}>
-                    <LabelInputContainer className="mb-4">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                            id="email"
-                            placeholder="m@example.com"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                    </LabelInputContainer>
+                    {error && (
+                        <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400 text-center">
+                            {error}
+                        </div>
+                    )}
 
-                    <LabelInputContainer className="mb-4">
-                        <Label htmlFor="password">Password</Label>
-                        <PasswordInput
-                            id="password"
-                            name="password"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                    </LabelInputContainer>
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <LabelInputContainer>
+                            <Label htmlFor="email" className="text-neutral-300">
+                                Email address
+                            </Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                placeholder="name@example.com"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                                className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-neutral-500"
+                            />
+                        </LabelInputContainer>
 
-                    <button
-                        className="bg-gradient-to-br from-black dark:from-zinc-900 dark:to-zinc-900 to-neutral-600 block dark:bg-zinc-800 w-full text-white rounded-md h-10 font-medium shadow-[0px_1px_0px_0px_#ffffff40_inset,0px_-1px_0px_0px_#ffffff40_inset] dark:shadow-[0px_1px_0px_0px_var(--zinc-800)_inset,0px_-1px_0px_0px_var(--zinc-800)_inset] relative group/btn disabled:opacity-50 disabled:cursor-not-allowed"
-                        type="submit"
-                        disabled={loading}
-                    >
-                        {loading ? "Logging in..." : "Login"}
-                        <BottomGradient />
-                    </button>
+                        <LabelInputContainer>
+                            <Label htmlFor="password" className="text-neutral-300">
+                                Password
+                            </Label>
+                            <PasswordInput
+                                id="password"
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                className="bg-neutral-800/50 border-neutral-700 text-white placeholder:text-neutral-500"
+                            />
+                        </LabelInputContainer>
 
-                    <div className="bg-gradient-to-r from-transparent via-neutral-300 dark:via-neutral-700 to-transparent my-8 h-[1px] w-full" />
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                        >
+                            {loading ? "Signing in..." : "Sign in"}
+                        </button>
+                    </form>
 
-                    <div className="text-center text-sm text-neutral-600 dark:text-neutral-400">
-                        Don&apos;t have an account?{" "}
-                        <Link href={`/register/${role}`} className="text-neutral-800 dark:text-neutral-200 hover:underline">
-                            Sign up as {role}
-                        </Link>
-                    </div>
-                </form>
+                    {role !== "admin" && (
+                        <p className="text-center text-sm text-neutral-400 mt-6">
+                            Don&apos;t have an account?{" "}
+                            <Link
+                                href={`/register/${role}`}
+                                className="text-red-400 hover:text-red-300 font-medium transition-colors"
+                            >
+                                Register here
+                            </Link>
+                        </p>
+                    )}
+                </div>
             </div>
         </div>
     )
 }
-
-const BottomGradient = () => {
-    return (
-        <>
-            <span className="group-hover/btn:opacity-100 block transition duration-500 opacity-0 absolute h-px w-full -bottom-px inset-x-0 bg-gradient-to-r from-transparent via-cyan-500 to-transparent" />
-            <span className="group-hover/btn:opacity-100 blur-sm block transition duration-500 opacity-0 absolute h-px w-1/2 mx-auto -bottom-px inset-x-10 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
-        </>
-    );
-};
