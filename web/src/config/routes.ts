@@ -15,6 +15,9 @@ import {
     FileCheck,
     Heart,
     ClipboardList,
+    Link2,
+    Zap,
+    Truck,
 } from "lucide-react"
 
 export const routes = {
@@ -42,6 +45,8 @@ export const routes = {
     ],
     admin: [
         { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+        { name: "Automation & n8n", href: "/admin/automation", icon: Zap },
+        { name: "Logistics", href: "/admin/logistics", icon: Truck },
         { name: "Blockchain Ledger", href: "/admin/blockchain", icon: Link2 },
         { name: "Hospitals", href: "/admin/hospitals", icon: Building2 },
         { name: "Donors", href: "/admin/donors", icon: Users },
