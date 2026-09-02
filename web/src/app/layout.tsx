@@ -21,8 +21,8 @@ const geistMono = Geist_Mono({
 import { ConvexClientProvider } from "@/components/providers/ConvexClientProvider";
 
 export const metadata: Metadata = {
-  title: "Scroll Tied Video Section",
-  description: "Scroll tied video cinematic experience",
+  title: "VeinLink | Blood & Organ Donation Network",
+  description: "Next-generation decentralized and intelligent blood and organ donation lifecycle management system.",
 };
 
 export default function RootLayout({

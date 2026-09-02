@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { WorkflowStatus } from "@/components/automation/WorkflowStatus"
 import {
     Activity,
     AlertOctagon,
@@ -24,12 +25,15 @@ import {
     Send,
     Server,
     ShieldAlert,
+    ShieldCheck,
     Sliders,
+    Stethoscope,
+    Truck,
     Zap,
 } from "lucide-react"
 
 export default function AutomationMonitorPage() {
-    const [activeTab, setActiveTab] = useState("events")
+    const [activeTab, setActiveTab] = useState("workflows")
     const [isSimulating, setIsSimulating] = useState(false)
 
     // Convex queries
@@ -75,572 +79,545 @@ export default function AutomationMonitorPage() {
         }
     }
 
-    const handleSimulateEvent = async (scenario: "SHORTAGE" | "ORGAN_AVAILABLE" | "DELAY" | "CV_MISMATCH") => {
+    const handleSimulateDemo = async (demoNumber: 1 | 2 | 3 | 4) => {
         setIsSimulating(true)
         try {
-            let eventType = "blood.inventory.critical"
-            let aggregateType = "bloodInventory"
-            let aggregateId = "BLD-INV-O-NEG"
-            let payload: any = { bloodType: "O-", currentUnits: 1, threshold: 5, facilityId: "HOSP-METRO" }
-
-            if (scenario === "ORGAN_AVAILABLE") {
-                eventType = "organ.available"
-                aggregateType = "organ"
-                aggregateId = "ORG-2026-99"
-                payload = { organType: "KIDNEY", bloodType: "O-", donorHospital: "General Hospital" }
-            } else if (scenario === "DELAY") {
-                eventType = "transport.delay.detected"
-                aggregateType = "transport"
-                aggregateId = "TR-2026-88"
-                payload = { delayMinutes: 45, reason: "Severe fog & air-corridor hold", isCriticalToDeadline: true }
-            } else if (scenario === "CV_MISMATCH") {
-                eventType = "verification.mismatch.detected"
-                aggregateType = "verification"
-                aggregateId = "VR-2026-77"
-                payload = {
-                    mismatches: [
-                        { field: "blood_group", expected: "O-", observed: "AB+", severity: "CRITICAL" }
-                    ]
-                }
+            if (demoNumber === 1) {
+                // DEMO 1: Blood Emergency -> Donor Matching -> Notification
+                await publishDomainEventMutation({
+                    eventType: "emergency.request.created",
+                    aggregateType: "donationRequest",
+                    aggregateId: `EMG-${Date.now().toString().slice(-4)}`,
+                    payload: {
+                        bloodGroup: "O-",
+                        urgency: "CRITICAL",
+                        facilityId: "AIIMS-TRAUMA-01",
+                        unitsRequested: 4,
+                        patientReference: "#P-992",
+                        isDemo: true,
+                    },
+                    metadata: { priority: "CRITICAL", environment: "staging" },
+                })
+                alert("DEMO 1 Dispatched: Blood emergency coordination triggered.")
+            } else if (demoNumber === 2) {
+                // DEMO 2: Organ Available -> AI Candidate Ranking -> Mandatory Human Review
+                await publishDomainEventMutation({
+                    eventType: "organ.available",
+                    aggregateType: "organ",
+                    aggregateId: `ORG-KIDNEY-${Date.now().toString().slice(-4)}`,
+                    payload: {
+                        organType: "KIDNEY",
+                        bloodType: "O+",
+                        donorHospital: "Apex Transplant Center",
+                        requiresHumanApproval: true,
+                        isDemo: true,
+                    },
+                    metadata: { priority: "CRITICAL", environment: "staging" },
+                })
+                alert("DEMO 2 Dispatched: Organ allocation review initiated with Mandatory Human Approval.")
+            } else if (demoNumber === 3) {
+                // DEMO 3: Shortage Forecast -> Intelligence Alert -> Admin Notification
+                await publishDomainEventMutation({
+                    eventType: "network.shortage.detected",
+                    aggregateType: "bloodInventory",
+                    aggregateId: "REGIONAL-SUPPLY-PUNE",
+                    payload: {
+                        region: "West Zone",
+                        predictedShortageProbability: 0.94,
+                        horizonHours: 72,
+                        criticalBloodGroup: "B-",
+                        isDemo: true,
+                    },
+                    metadata: { priority: "HIGH", environment: "staging" },
+                })
+                alert("DEMO 3 Dispatched: Predictive shortage intelligence alert emitted.")
+            } else if (demoNumber === 4) {
+                // DEMO 4: Transport Delay -> Cold-Chain Alarm -> Merkle Audit
+                await publishDomainEventMutation({
+                    eventType: "transport.delay.detected",
+                    aggregateType: "transport",
+                    aggregateId: `TR-AIR-${Date.now().toString().slice(-4)}`,
+                    payload: {
+                        delayMinutes: 35,
+                        coldChainBufferRemainingHours: 4.8,
+                        reason: "Air-traffic corridor hold",
+                        merkleProofRequired: true,
+                        isDemo: true,
+                    },
+                    metadata: { priority: "HIGH", environment: "staging" },
+                })
+                alert("DEMO 4 Dispatched: Transport delay detected with Merkle hash integrity verification.")
             }
-
-            const res = await publishDomainEventMutation({
-                eventType,
-                aggregateType,
-                aggregateId,
-                payload,
-                actorType: "admin",
-            })
-
-            alert(`Simulated domain event [${eventType}] emitted!\nEvent ID: ${res.eventId}`)
         } catch (err: any) {
-            alert(err?.message || "Simulation failed.")
+            alert(err?.message || "Failed to emit demo event.")
         } finally {
             setIsSimulating(false)
         }
     }
 
     return (
-        <div className="space-y-6 p-6">
-            <div>
-                <div className="flex items-center gap-2">
-                    <Zap className="h-7 w-7 text-amber-500 fill-amber-500/20" />
-                    <h2 className="text-3xl font-bold tracking-tight">n8n Workflow Automation Monitor</h2>
+        <div className="w-full max-w-7xl mx-auto space-y-6 pb-12">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-5">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                        n8n Automation & Workflow Observability
+                    </h1>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                        Unified monitoring of the 5 canonical business workflows, HMAC webhook security, idempotency keys, and correlation tracing.
+                    </p>
                 </div>
-                <p className="text-muted-foreground mt-1">
-                    Event-driven orchestration, domain event streams, automated escalation chains, and dead-letter queue management.
-                </p>
             </div>
 
-            {/* KPI Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-5">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Domain Events</CardTitle>
-                        <Activity className="h-4 w-4 text-blue-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{domainEvents.length}</div>
-                        <p className="text-xs text-muted-foreground">Emitted from Convex</p>
-                    </CardContent>
+            {/* Quick Metrics */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="rounded-2xl border-border/60 bg-card/60 p-4">
+                    <span className="text-xs text-muted-foreground font-medium">Domain Events Stream</span>
+                    <div className="text-2xl sm:text-3xl font-bold font-mono text-foreground mt-1">{domainEvents.length}</div>
+                    <span className="text-[10px] text-muted-foreground">Immutable audit stream</span>
                 </Card>
 
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Completed Workflows</CardTitle>
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{completedExecutions}</div>
-                        <p className="text-xs text-muted-foreground">Idempotent executions</p>
-                    </CardContent>
+                <Card className="rounded-2xl border-border/60 bg-card/60 p-4">
+                    <span className="text-xs text-muted-foreground font-medium">Workflow Executions</span>
+                    <div className="text-2xl sm:text-3xl font-bold font-mono text-emerald-500 mt-1">{completedExecutions}</div>
+                    <span className="text-[10px] text-muted-foreground">Successfully orchestrated</span>
                 </Card>
 
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Active Escalations</CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{activeEscalations}</div>
-                        <p className="text-xs text-muted-foreground">Pending human review</p>
-                    </CardContent>
+                <Card className="rounded-2xl border-border/60 bg-card/60 p-4">
+                    <span className="text-xs text-muted-foreground font-medium">Active Escalations</span>
+                    <div className="text-2xl sm:text-3xl font-bold font-mono text-amber-500 mt-1">{activeEscalations}</div>
+                    <span className="text-[10px] text-muted-foreground">Requiring coordinator review</span>
                 </Card>
 
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">Dead Letter Queue</CardTitle>
-                        <AlertOctagon className="h-4 w-4 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{deadLetterExecutions}</div>
-                        <p className="text-xs text-muted-foreground">&gt; 3 failed delivery retries</p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-sm font-medium">System Role</CardTitle>
-                        <Server className="h-4 w-4 text-purple-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-sm font-bold text-primary">Orchestration</div>
-                        <p className="text-xs text-muted-foreground">Convex = System of Record</p>
-                    </CardContent>
+                <Card className="rounded-2xl border-border/60 bg-card/60 p-4">
+                    <span className="text-xs text-muted-foreground font-medium">Dead Letter Queue</span>
+                    <div className="text-2xl sm:text-3xl font-bold font-mono text-red-500 mt-1">{deadLetterExecutions}</div>
+                    <span className="text-[10px] text-muted-foreground">Failed or poisoned events</span>
                 </Card>
             </div>
 
-            {/* Navigation Tabs */}
+            {/* Tabbed Views */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="grid grid-cols-5 w-full max-w-4xl">
-                    <TabsTrigger value="events" className="flex items-center gap-1.5">
-                        <Activity className="h-4 w-4" />
-                        <span>Event Stream</span>
+                <TabsList className="bg-card border border-border/60 p-1 rounded-xl">
+                    <TabsTrigger value="workflows" className="text-xs font-semibold rounded-lg">
+                        <Layers className="w-3.5 h-3.5 mr-1.5" /> 5 Canonical Workflows
                     </TabsTrigger>
-                    <TabsTrigger value="escalations" className="flex items-center gap-1.5">
-                        <AlertTriangle className="h-4 w-4 text-amber-500" />
-                        <span>Escalations</span>
+                    <TabsTrigger value="events" className="text-xs font-semibold rounded-lg">
+                        <Activity className="w-3.5 h-3.5 mr-1.5" /> Event Stream ({domainEvents.length})
                     </TabsTrigger>
-                    <TabsTrigger value="executions" className="flex items-center gap-1.5">
-                        <Play className="h-4 w-4 text-emerald-500" />
-                        <span>Executions</span>
+                    <TabsTrigger value="executions" className="text-xs font-semibold rounded-lg">
+                        <Server className="w-3.5 h-3.5 mr-1.5" /> Executions ({workflowExecutions.length})
                     </TabsTrigger>
-                    <TabsTrigger value="catalog" className="flex items-center gap-1.5">
-                        <Layers className="h-4 w-4 text-blue-500" />
-                        <span>Workflow Catalog</span>
+                    <TabsTrigger value="escalations" className="text-xs font-semibold rounded-lg">
+                        <ShieldAlert className="w-3.5 h-3.5 mr-1.5" /> Escalations ({workflowEscalations.length})
                     </TabsTrigger>
-                    <TabsTrigger value="simulate" className="flex items-center gap-1.5">
-                        <Zap className="h-4 w-4 text-amber-500" />
-                        <span>Simulate Events</span>
+                    <TabsTrigger value="demo" className="text-xs font-semibold rounded-lg text-purple-400">
+                        <Play className="w-3.5 h-3.5 mr-1.5" /> Hackathon Demo Suite
                     </TabsTrigger>
                 </TabsList>
 
-                {/* Tab 1: Domain Event Stream */}
-                <TabsContent value="events" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Authoritative Domain Event Stream</CardTitle>
-                            <CardDescription>
-                                Immutable log of domain events emitted server-side by Convex mutations, signed with HMAC SHA-256.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Event ID</TableHead>
-                                        <TableHead>Event Type</TableHead>
-                                        <TableHead>Aggregate</TableHead>
-                                        <TableHead>Delivery Status</TableHead>
-                                        <TableHead>Attempts</TableHead>
-                                        <TableHead>Occurred At</TableHead>
-                                        <TableHead className="text-right">Replay Action</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {domainEvents.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                                No domain events emitted yet. Use the Simulate Events tab to generate live events.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        domainEvents.map((evt: any) => (
-                                            <TableRow key={evt._id}>
-                                                <TableCell className="font-mono text-xs font-semibold">{evt.eventId}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline">{evt.eventType}</Badge>
-                                                </TableCell>
-                                                <TableCell className="text-xs">
-                                                    {evt.aggregate?.type}: {evt.aggregate?.id?.substring(0, 10)}...
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant={
-                                                            evt.deliveryStatus === "DELIVERED"
-                                                                ? "default"
-                                                                : evt.deliveryStatus === "DEAD_LETTER"
-                                                                ? "destructive"
-                                                                : "secondary"
-                                                        }
-                                                    >
-                                                        {evt.deliveryStatus}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-xs">{evt.deliveryAttempts}</TableCell>
-                                                <TableCell className="text-xs text-muted-foreground">
-                                                    {new Date(evt.occurredAt).toLocaleTimeString()}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-7 text-xs"
-                                                        onClick={() => handleReplay(evt.eventId)}
-                                                    >
-                                                        <RotateCcw className="h-3 w-3 mr-1" /> Replay
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
+                {/* Tab 1: 5 Canonical Workflows */}
+                <TabsContent value="workflows" className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {/* 1. Emergency Coordination */}
+                        <Card className="rounded-2xl border-border/60 bg-card/80 p-5 flex flex-col justify-between shadow-xs">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30 text-[10px] font-bold">
+                                        WORKFLOW #1
+                                    </Badge>
+                                    <Badge variant="outline" className="text-[10px] text-muted-foreground font-mono">
+                                        emergency.request.created
+                                    </Badge>
+                                </div>
+                                <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                                    <Flame className="w-4 h-4 text-red-500" />
+                                    VeinLink - Emergency Coordination
+                                </h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Orchestrates multi-facility blood and organ emergencies. Dispatches regional notifications, mobilizes reserves, and handles critical escalations.
+                                </p>
+                            </div>
+                            <div className="pt-4 border-t border-border/40 mt-3 text-[11px] text-muted-foreground space-y-1">
+                                <div>Domains: <strong className="text-foreground">Blood Emergency & Organ Emergency</strong></div>
+                                <div>Safety: <strong className="text-foreground">Zero autonomous decisions without human confirmation</strong></div>
+                            </div>
+                        </Card>
+
+                        {/* 2. Blood Donor Matching */}
+                        <Card className="rounded-2xl border-border/60 bg-card/80 p-5 flex flex-col justify-between shadow-xs">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px] font-bold">
+                                        WORKFLOW #2
+                                    </Badge>
+                                    <Badge variant="outline" className="text-[10px] text-muted-foreground font-mono">
+                                        blood.donor.matching
+                                    </Badge>
+                                </div>
+                                <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-amber-500" />
+                                    VeinLink - Blood Donor Matching
+                                </h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Executes ABO compatibility queries on verified donors, sends real-time opt-in notifications, and updates hospital fulfillment queues.
+                                </p>
+                            </div>
+                            <div className="pt-4 border-t border-border/40 mt-3 text-[11px] text-muted-foreground space-y-1">
+                                <div>Matching: <strong className="text-foreground">Convex Authoritative Engine</strong></div>
+                                <div>Safety: <strong className="text-foreground">Enforces strict 56-day medical cooldown</strong></div>
+                            </div>
+                        </Card>
+
+                        {/* 3. Organ Allocation Review */}
+                        <Card className="rounded-2xl border-border/60 bg-card/80 p-5 flex flex-col justify-between shadow-xs">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className="bg-purple-500/10 text-purple-500 border-purple-500/30 text-[10px] font-bold">
+                                        WORKFLOW #3
+                                    </Badge>
+                                    <Badge variant="outline" className="text-[10px] text-muted-foreground font-mono">
+                                        organ.allocation.review
+                                    </Badge>
+                                </div>
+                                <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                                    <Stethoscope className="w-4 h-4 text-purple-500" />
+                                    VeinLink - Organ Allocation Review
+                                </h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Ranks compatible candidate pool with Pareto optimization, generates explainability rationale, and holds cases for Mandatory Human Clinician Review.
+                                </p>
+                            </div>
+                            <div className="pt-4 border-t border-border/40 mt-3 text-[11px] text-muted-foreground space-y-1">
+                                <div>Governance: <strong className="text-purple-400">Strict Human Oversight Invariant</strong></div>
+                                <div>Safety: <strong className="text-foreground">Zero autonomous organ allocation</strong></div>
+                            </div>
+                        </Card>
+
+                        {/* 4. Intelligence Alerts */}
+                        <Card className="rounded-2xl border-border/60 bg-card/80 p-5 flex flex-col justify-between shadow-xs">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30 text-[10px] font-bold">
+                                        WORKFLOW #4
+                                    </Badge>
+                                    <Badge variant="outline" className="text-[10px] text-muted-foreground font-mono">
+                                        network.shortage.detected
+                                    </Badge>
+                                </div>
+                                <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                                    <Activity className="w-4 h-4 text-blue-500" />
+                                    VeinLink - Intelligence Alerts
+                                </h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Monitors statistical surge anomalies (+3.5σ), runs 72h shortage forecasts with 90% prediction intervals, and alerts network operations directors.
+                                </p>
+                            </div>
+                            <div className="pt-4 border-t border-border/40 mt-3 text-[11px] text-muted-foreground space-y-1">
+                                <div>Forecasting: <strong className="text-foreground">ARIMA/Ensemble ML Service</strong></div>
+                                <div>Alerts: <strong className="text-foreground">Low / Medium / High / Critical Tiers</strong></div>
+                            </div>
+                        </Card>
+
+                        {/* 5. Logistics + Audit */}
+                        <Card className="rounded-2xl border-border/60 bg-card/80 p-5 flex flex-col justify-between shadow-xs">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-[10px] font-bold">
+                                        WORKFLOW #5
+                                    </Badge>
+                                    <Badge variant="outline" className="text-[10px] text-muted-foreground font-mono">
+                                        transport.delay.detected
+                                    </Badge>
+                                </div>
+                                <h3 className="font-bold text-base text-foreground flex items-center gap-2">
+                                    <Truck className="w-4 h-4 text-emerald-500" />
+                                    VeinLink - Logistics + Audit
+                                </h3>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    Tracks active aeromedical and cold-chain transports, monitors cold ischemia buffer limits, emits delay alarms, and anchors Merkle root proofs on-ledger.
+                                </p>
+                            </div>
+                            <div className="pt-4 border-t border-border/40 mt-3 text-[11px] text-muted-foreground space-y-1">
+                                <div>Cold Ischemia: <strong className="text-foreground">Dynamic Time-to-Expire Alarms</strong></div>
+                                <div>Trust: <strong className="text-foreground">Zero-PHI On-Chain Merkle Provenance</strong></div>
+                            </div>
+                        </Card>
+                    </div>
                 </TabsContent>
 
-                {/* Tab 2: Workflow Escalations */}
-                <TabsContent value="escalations" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Active Healthcare Operational Escalations</CardTitle>
-                            <CardDescription>
-                                Unresolved alarms escalated by n8n workflows requiring clinical or logistical coordinator review.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
+                {/* Tab 2: Domain Events Stream */}
+                <TabsContent value="events" className="space-y-4">
+                    <Card className="rounded-2xl border-border/60 bg-card/80 shadow-xs overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="border-border/60 bg-muted/30">
+                                    <TableHead className="text-xs">Event ID / Type</TableHead>
+                                    <TableHead className="text-xs">Aggregate / Entity</TableHead>
+                                    <TableHead className="text-xs">Correlation ID</TableHead>
+                                    <TableHead className="text-xs">Actor / Source</TableHead>
+                                    <TableHead className="text-xs">Timestamp</TableHead>
+                                    <TableHead className="text-xs text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {domainEvents.length === 0 ? (
                                     <TableRow>
-                                        <TableHead>Escalation ID</TableHead>
-                                        <TableHead>Workflow</TableHead>
-                                        <TableHead>Severity</TableHead>
-                                        <TableHead>Entity</TableHead>
-                                        <TableHead>Reason</TableHead>
-                                        <TableHead>Assigned Role</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Coordinator Action</TableHead>
+                                        <TableCell colSpan={6} className="text-center py-8 text-xs text-muted-foreground">
+                                            No domain events recorded yet.
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {workflowEscalations.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                                                No active workflow escalations recorded.
+                                ) : (
+                                    domainEvents.map((evt: any) => (
+                                        <TableRow key={evt._id} className="border-border/40">
+                                            <TableCell className="text-xs font-mono">
+                                                <div className="font-bold text-foreground">{evt.eventType}</div>
+                                                <div className="text-[10px] text-muted-foreground">{evt.eventId}</div>
+                                            </TableCell>
+                                            <TableCell className="text-xs font-mono">
+                                                {evt.aggregate?.type}:{evt.aggregate?.id}
+                                            </TableCell>
+                                            <TableCell className="text-xs font-mono text-purple-400">
+                                                {evt.correlationId}
+                                            </TableCell>
+                                            <TableCell className="text-xs">
+                                                <Badge variant="outline" className="text-[9px]">
+                                                    {evt.actor?.type || "system"}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {new Date(evt.occurredAt).toLocaleTimeString()}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                                    onClick={() => handleReplay(evt.eventId)}
+                                                >
+                                                    <RotateCcw className="w-3 h-3 mr-1" /> Replay
+                                                </Button>
                                             </TableCell>
                                         </TableRow>
-                                    ) : (
-                                        workflowEscalations.map((esc: any) => (
-                                            <TableRow key={esc._id}>
-                                                <TableCell className="font-mono text-xs font-semibold">{esc.escalationId}</TableCell>
-                                                <TableCell className="text-xs">{esc.workflowName}</TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant={
-                                                            esc.severity === "CRITICAL"
-                                                                ? "destructive"
-                                                                : esc.severity === "HIGH"
-                                                                ? "secondary"
-                                                                : "outline"
-                                                        }
-                                                    >
-                                                        {esc.severity}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-xs">{esc.entityId}</TableCell>
-                                                <TableCell className="text-xs max-w-xs truncate">{esc.reason}</TableCell>
-                                                <TableCell className="text-xs font-medium">{esc.assignedRole}</TableCell>
-                                                <TableCell>
-                                                    <Badge variant="outline">{esc.status}</Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right space-x-1">
-                                                    {esc.status === "ACTIVE" && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-7 text-xs"
-                                                            onClick={() => handleAcknowledge(esc.escalationId)}
-                                                        >
-                                                            Acknowledge
-                                                        </Button>
-                                                    )}
-                                                    {esc.status !== "RESOLVED" && (
-                                                        <Button
-                                                            size="sm"
-                                                            className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                            onClick={() => handleResolve(esc.escalationId)}
-                                                        >
-                                                            Resolve
-                                                        </Button>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
                     </Card>
                 </TabsContent>
 
                 {/* Tab 3: Workflow Executions */}
                 <TabsContent value="executions" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Idempotent Workflow Execution History</CardTitle>
-                            <CardDescription>
-                                Tracked n8n workflow executions with idempotency key enforcement and retry monitoring.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
+                    <Card className="rounded-2xl border-border/60 bg-card/80 shadow-xs overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="border-border/60 bg-muted/30">
+                                    <TableHead className="text-xs">Workflow Name</TableHead>
+                                    <TableHead className="text-xs">Execution ID</TableHead>
+                                    <TableHead className="text-xs">Status</TableHead>
+                                    <TableHead className="text-xs">Duration</TableHead>
+                                    <TableHead className="text-xs">Correlation ID</TableHead>
+                                    <TableHead className="text-xs">Executed At</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {workflowExecutions.length === 0 ? (
                                     <TableRow>
-                                        <TableHead>Execution ID</TableHead>
-                                        <TableHead>Workflow</TableHead>
-                                        <TableHead>Event ID</TableHead>
-                                        <TableHead>Idempotency Key</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Attempts</TableHead>
-                                        <TableHead>Actions Recorded</TableHead>
+                                        <TableCell colSpan={6} className="text-center py-8 text-xs text-muted-foreground">
+                                            No workflow execution logs found.
+                                        </TableCell>
                                     </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {workflowExecutions.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                                No executions recorded yet.
+                                ) : (
+                                    workflowExecutions.map((exec: any) => (
+                                        <TableRow key={exec._id} className="border-border/40">
+                                            <TableCell className="text-xs font-bold text-foreground">
+                                                {exec.workflowName}
+                                            </TableCell>
+                                            <TableCell className="text-xs font-mono text-muted-foreground">
+                                                {exec.executionId}
+                                            </TableCell>
+                                            <TableCell className="text-xs">
+                                                <Badge
+                                                    className={`text-[10px] ${
+                                                        exec.status === "COMPLETED"
+                                                            ? "bg-emerald-600 text-white"
+                                                            : exec.status === "DEAD_LETTER"
+                                                            ? "bg-red-600 text-white"
+                                                            : "bg-amber-600 text-white"
+                                                    }`}
+                                                >
+                                                    {exec.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-xs font-mono text-muted-foreground">
+                                                {exec.durationMs ? `${exec.durationMs}ms` : "-"}
+                                            </TableCell>
+                                            <TableCell className="text-xs font-mono text-purple-400">
+                                                {exec.correlationId}
+                                            </TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">
+                                                {new Date(exec.startedAt).toLocaleTimeString()}
                                             </TableCell>
                                         </TableRow>
-                                    ) : (
-                                        workflowExecutions.map((ex: any) => (
-                                            <TableRow key={ex._id}>
-                                                <TableCell className="font-mono text-xs">{ex.executionId}</TableCell>
-                                                <TableCell className="text-xs font-semibold">{ex.workflowName}</TableCell>
-                                                <TableCell className="font-mono text-xs">{ex.eventId}</TableCell>
-                                                <TableCell className="font-mono text-xs text-muted-foreground truncate max-w-xs">
-                                                    {ex.idempotencyKey}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant={
-                                                            ex.status === "COMPLETED"
-                                                                ? "default"
-                                                                : ex.status === "DEAD_LETTER"
-                                                                ? "destructive"
-                                                                : "secondary"
-                                                        }
-                                                    >
-                                                        {ex.status}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-xs">{ex.attemptCount}</TableCell>
-                                                <TableCell className="text-xs">{ex.actionsTaken?.length ?? 0} steps</TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
                     </Card>
                 </TabsContent>
 
-                {/* Tab 4: Workflow Catalog */}
-                <TabsContent value="catalog" className="space-y-4">
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <Flame className="h-4 w-4 text-red-500" />
-                                    <span>Workflow #1: Critical Blood Shortage</span>
-                                </CardTitle>
-                                <CardDescription>Trigger: blood.inventory.low / critical</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-xs space-y-1 text-muted-foreground">
-                                <p><strong>Purpose:</strong> Evaluates reserve thresholds and routes urgent alerts to blood-bank coordinators.</p>
-                                <p><strong>Target Roles:</strong> Regional Blood Bank Coordinator, Hospital Transfusion Lead.</p>
-                                <p><strong>Safety Invariant:</strong> Convex remains authoritative on blood reserves and unit release.</p>
-                            </CardContent>
-                        </Card>
+                {/* Tab 4: Escalations */}
+                <TabsContent value="escalations" className="space-y-4">
+                    <div className="space-y-3">
+                        {workflowEscalations.length === 0 ? (
+                            <div className="p-12 text-center border border-dashed border-border/60 rounded-2xl bg-card/30">
+                                <ShieldCheck className="w-10 h-10 text-emerald-500 mx-auto mb-3 opacity-60" />
+                                <h3 className="font-semibold text-sm text-foreground">All Escalations Resolved</h3>
+                                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                                    No unresolved alarms requiring clinical coordinator intervention.
+                                </p>
+                            </div>
+                        ) : (
+                            workflowEscalations.map((esc: any) => (
+                                <Card key={esc._id} className="rounded-2xl border-border/60 bg-card/80 p-4 shadow-xs">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/30 text-[10px]">
+                                                    {esc.severity || "CRITICAL"}
+                                                </Badge>
+                                                <h3 className="font-bold text-sm text-foreground">{esc.escalationType}</h3>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">{esc.reason || "Automated escalation triggered by workflow policy."}</p>
+                                        </div>
 
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                                    <span>Workflow #2: Emergency Blood Request</span>
-                                </CardTitle>
-                                <CardDescription>Trigger: emergency.request.created</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-xs space-y-1 text-muted-foreground">
-                                <p><strong>Purpose:</strong> Queries Convex matching engine to broadcast targeted alerts to nearby donors within 15km.</p>
-                                <p><strong>Target Roles:</strong> Verified compatible donors, on-call transfusion officer.</p>
-                                <p><strong>Safety Invariant:</strong> n8n never determines donor eligibility; uses Convex compatibility engine.</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                                    <span>Workflow #3: Organ Available & Review</span>
-                                </CardTitle>
-                                <CardDescription>Trigger: organ.available</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-xs space-y-1 text-muted-foreground">
-                                <p><strong>Purpose:</strong> Initiates matching and allocation optimization, creating a review task for coordinator.</p>
-                                <p><strong>Target Roles:</strong> Accredited Transplant Coordinator, Surgical Lead.</p>
-                                <p><strong>Safety Invariant:</strong> n8n NEVER allocates organs. Human approval is mandatory.</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-blue-500" />
-                                    <span>Workflow #4: Organ Preservation Warning</span>
-                                </CardTitle>
-                                <CardDescription>Trigger: organ.preservation.warning / critical</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-xs space-y-1 text-muted-foreground">
-                                <p><strong>Purpose:</strong> Evaluates cold ischemia countdown and escalates alerts through Low to Critical tiers.</p>
-                                <p><strong>Target Roles:</strong> Transplant Coordinator, Aeromedical Dispatch Crew, Chief Medical Officer.</p>
-                                <p><strong>Safety Invariant:</strong> Never silently reallocates organs when preservation window changes.</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <AlertOctagon className="h-4 w-4 text-red-500" />
-                                    <span>Workflow #5: Logistics Delay Escalation</span>
-                                </CardTitle>
-                                <CardDescription>Trigger: transport.delay.detected</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-xs space-y-1 text-muted-foreground">
-                                <p><strong>Purpose:</strong> Evaluates transit slippage against remaining cold ischemia time and alerts hospital team.</p>
-                                <p><strong>Target Roles:</strong> Medical Transport Carrier, Destination Hospital Arrival Team.</p>
-                                <p><strong>Safety Invariant:</strong> Preserves active allocation; routes re-routing decisions to human coordinator.</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <ShieldAlert className="h-4 w-4 text-cyan-500" />
-                                    <span>Workflow #6: CV / OCR Mismatch Escalation</span>
-                                </CardTitle>
-                                <CardDescription>Trigger: verification.mismatch.detected</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-xs space-y-1 text-muted-foreground">
-                                <p><strong>Purpose:</strong> Pauses transit/handover when physical label does not match authoritative digital record.</p>
-                                <p><strong>Target Roles:</strong> Quality Assurance Coordinator, Transplant Center.</p>
-                                <p><strong>Safety Invariant:</strong> OCR extractions NEVER automatically mutate database records.</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <Repeat className="h-4 w-4 text-purple-500" />
-                                    <span>Workflow #7: Donor Follow-Up</span>
-                                </CardTitle>
-                                <CardDescription>Trigger: blood.donation.completed / expired</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-xs space-y-1 text-muted-foreground">
-                                <p><strong>Purpose:</strong> Sends post-donation gratitude messages and schedules 56-day future eligibility reminders.</p>
-                                <p><strong>Target Roles:</strong> Donors.</p>
-                                <p><strong>Safety Invariant:</strong> Adheres strictly to authoritative 56-day medical cooldown state.</p>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <GitCommit className="h-4 w-4 text-amber-500" />
-                                    <span>Workflow #8: Unresolved Emergency Escalation</span>
-                                </CardTitle>
-                                <CardDescription>Trigger: network.escalation.triggered</CardDescription>
-                            </CardHeader>
-                            <CardContent className="text-xs space-y-1 text-muted-foreground">
-                                <p><strong>Purpose:</strong> Escalates unfulfilled emergency blood requests to regional network operations directors.</p>
-                                <p><strong>Target Roles:</strong> Network Operations Administrator, Regional Director.</p>
-                                <p><strong>Safety Invariant:</strong> Preserves complete audit trail of timing and escalation decisions.</p>
-                            </CardContent>
-                        </Card>
+                                        <div className="flex items-center gap-2">
+                                            {esc.status === "ACTIVE" && (
+                                                <Button size="sm" variant="outline" className="text-xs h-8" onClick={() => handleAcknowledge(esc._id)}>
+                                                    Acknowledge
+                                                </Button>
+                                            )}
+                                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8" onClick={() => handleResolve(esc._id)}>
+                                                Mark Resolved
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))
+                        )}
                     </div>
                 </TabsContent>
 
-                {/* Tab 5: Event Simulation Panel */}
-                <TabsContent value="simulate" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Healthcare Event Simulation Testing Suite</CardTitle>
-                            <CardDescription>
-                                Trigger realistic healthcare domain events to verify n8n dispatch, webhook HMAC validation, and escalation handling.
+                {/* Tab 5: Hackathon Demo Suite */}
+                <TabsContent value="demo" className="space-y-4">
+                    <Card className="rounded-2xl border-purple-500/30 bg-gradient-to-br from-purple-500/5 via-card to-card p-6 shadow-sm">
+                        <CardHeader className="p-0 pb-4">
+                            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
+                                <Play className="w-5 h-5 text-purple-500" />
+                                VeinLink Hackathon Live Judge Demonstration Scenarios
+                            </CardTitle>
+                            <CardDescription className="text-xs text-muted-foreground">
+                                Trigger the 4 end-to-end automation workflows. Each scenario creates real-time domain events, updates Convex, and streams real-time updates.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="grid md:grid-cols-2 gap-4">
-                            <div className="p-4 rounded-lg border bg-card space-y-3">
-                                <h4 className="font-semibold text-sm flex items-center gap-2">
-                                    <Flame className="h-4 w-4 text-red-500" /> Critical Blood Shortage Event
-                                </h4>
-                                <p className="text-xs text-muted-foreground">
-                                    Emits `blood.inventory.critical` with 1 unit remaining of O- blood. Tests coordinator alert dispatch and escalation creation.
-                                </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            {/* DEMO 1 */}
+                            <div className="p-4 rounded-xl border border-red-500/30 bg-card/90 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Badge className="bg-red-600 text-white text-[10px] font-bold">DEMO 1</Badge>
+                                    <span className="text-[10px] text-muted-foreground font-mono">[DEMO DATA]</span>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                                        <Flame className="w-4 h-4 text-red-500" /> Blood Emergency & Matching
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                        Emits `emergency.request.created` for O- mass casualty shock. Executes candidate matching and broadcasts donor notifications.
+                                    </p>
+                                </div>
                                 <Button
                                     size="sm"
-                                    className="w-full bg-red-600 hover:bg-red-700 text-white"
-                                    onClick={() => handleSimulateEvent("SHORTAGE")}
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold h-9 rounded-xl"
+                                    onClick={() => handleSimulateDemo(1)}
                                     disabled={isSimulating}
                                 >
-                                    Emit Blood Shortage Event
+                                    Execute Demo 1 (Blood Emergency)
                                 </Button>
                             </div>
 
-                            <div className="p-4 rounded-lg border bg-card space-y-3">
-                                <h4 className="font-semibold text-sm flex items-center gap-2">
-                                    <CheckCircle2 className="h-4 w-4 text-emerald-500" /> Organ Available Event
-                                </h4>
-                                <p className="text-xs text-muted-foreground">
-                                    Emits `organ.available` for verified donor kidney. Tests candidate retrieval and coordinator review task initialization.
-                                </p>
+                            {/* DEMO 2 */}
+                            <div className="p-4 rounded-xl border border-purple-500/30 bg-card/90 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Badge className="bg-purple-600 text-white text-[10px] font-bold">DEMO 2</Badge>
+                                    <span className="text-[10px] text-muted-foreground font-mono">[DEMO DATA]</span>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                                        <Stethoscope className="w-4 h-4 text-purple-500" /> Organ Allocation Review
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                        Emits `organ.available` for verified donor kidney. Computes AI match scores, generates explainability, and pauses for Mandatory Human Review.
+                                    </p>
+                                </div>
                                 <Button
                                     size="sm"
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                                    onClick={() => handleSimulateEvent("ORGAN_AVAILABLE")}
+                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold h-9 rounded-xl"
+                                    onClick={() => handleSimulateDemo(2)}
                                     disabled={isSimulating}
                                 >
-                                    Emit Organ Available Event
+                                    Execute Demo 2 (Organ Review)
                                 </Button>
                             </div>
 
-                            <div className="p-4 rounded-lg border bg-card space-y-3">
-                                <h4 className="font-semibold text-sm flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-amber-500" /> Logistics Transit Delay Event
-                                </h4>
-                                <p className="text-xs text-muted-foreground">
-                                    Emits `transport.delay.detected` (45 min delay threatening deadline). Tests ETA recalculation and coordinator escalation.
-                                </p>
+                            {/* DEMO 3 */}
+                            <div className="p-4 rounded-xl border border-blue-500/30 bg-card/90 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Badge className="bg-blue-600 text-white text-[10px] font-bold">DEMO 3</Badge>
+                                    <span className="text-[10px] text-muted-foreground font-mono">[DEMO DATA]</span>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                                        <Activity className="w-4 h-4 text-blue-500" /> Shortage Intelligence Alert
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                        Emits `network.shortage.detected` (94% shortage risk within 72h). Evaluates risk thresholds and alerts regional network directors.
+                                    </p>
+                                </div>
                                 <Button
                                     size="sm"
-                                    variant="outline"
-                                    className="w-full text-amber-500 border-amber-500 hover:bg-amber-500/10"
-                                    onClick={() => handleSimulateEvent("DELAY")}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold h-9 rounded-xl"
+                                    onClick={() => handleSimulateDemo(3)}
                                     disabled={isSimulating}
                                 >
-                                    Emit Transport Delay Event
+                                    Execute Demo 3 (Shortage Alert)
                                 </Button>
                             </div>
 
-                            <div className="p-4 rounded-lg border bg-card space-y-3">
-                                <h4 className="font-semibold text-sm flex items-center gap-2">
-                                    <ShieldAlert className="h-4 w-4 text-cyan-500" /> CV / OCR Physical Discrepancy Event
-                                </h4>
-                                <p className="text-xs text-muted-foreground">
-                                    Emits `verification.mismatch.detected` (physical blood group conflict). Tests operational pause and QA coordinator escalation.
-                                </p>
+                            {/* DEMO 4 */}
+                            <div className="p-4 rounded-xl border border-emerald-500/30 bg-card/90 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Badge className="bg-emerald-600 text-white text-[10px] font-bold">DEMO 4</Badge>
+                                    <span className="text-[10px] text-muted-foreground font-mono">[DEMO DATA]</span>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                                        <Truck className="w-4 h-4 text-emerald-500" /> Logistics Delay & Merkle Audit
+                                    </h4>
+                                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                                        Emits `transport.delay.detected` (35 min air hold). Re-estimates cold ischemia safety buffer and stamps cryptographic hash on-ledger.
+                                    </p>
+                                </div>
                                 <Button
                                     size="sm"
-                                    variant="outline"
-                                    className="w-full text-cyan-500 border-cyan-500 hover:bg-cyan-500/10"
-                                    onClick={() => handleSimulateEvent("CV_MISMATCH")}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold h-9 rounded-xl"
+                                    onClick={() => handleSimulateDemo(4)}
                                     disabled={isSimulating}
                                 >
-                                    Emit CV Mismatch Event
+                                    Execute Demo 4 (Logistics + Audit)
                                 </Button>
                             </div>
-                        </CardContent>
+                        </div>
                     </Card>
                 </TabsContent>
             </Tabs>

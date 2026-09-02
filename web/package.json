@@ -1,5 +1,5 @@
 {
-  "name": "jdjd",
+  "name": "veinlink-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -19,7 +19,8 @@
     "test:intelligence": "tsx scripts/test-advanced-intelligence.ts",
     "test:e2e-scenario": "tsx scripts/test-end-to-end-scenario.ts",
     "test:donor-verification": "tsx scripts/test-donor-verification-and-donation.ts",
-    "test:organ-requests": "tsx scripts/test-hospital-organ-requests-and-evaluations.ts"
+    "test:organ-requests": "tsx scripts/test-hospital-organ-requests-and-evaluations.ts",
+    "test:n8n-e2e": "tsx scripts/test-n8n-e2e-integration.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.8.4",
