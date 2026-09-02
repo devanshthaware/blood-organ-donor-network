@@ -16,6 +16,7 @@ import type * as checkups from "../checkups.js";
 import type * as consent from "../consent.js";
 import type * as crons from "../crons.js";
 import type * as domainConstants from "../domainConstants.js";
+import type * as donorVerification from "../donorVerification.js";
 import type * as donors from "../donors.js";
 import type * as governance_consentService from "../governance/consentService.js";
 import type * as governance_privacyGate from "../governance/privacyGate.js";
@@ -45,6 +46,7 @@ import type * as n8n_workflows_logisticsDelayWorkflow from "../n8n/workflows/log
 import type * as n8n_workflows_organAvailableWorkflow from "../n8n/workflows/organAvailableWorkflow.js";
 import type * as n8n_workflows_preservationWarningWorkflow from "../n8n/workflows/preservationWarningWorkflow.js";
 import type * as n8n_workflows_unresolvedEmergencyWorkflow from "../n8n/workflows/unresolvedEmergencyWorkflow.js";
+import type * as notifications from "../notifications.js";
 import type * as organAllocation_allocationPolicy from "../organAllocation/allocationPolicy.js";
 import type * as organAllocation_approvalWorkflow from "../organAllocation/approvalWorkflow.js";
 import type * as organAllocation_eligibilityGate from "../organAllocation/eligibilityGate.js";
@@ -65,6 +67,7 @@ import type * as organMatching_explanationBuilder from "../organMatching/explana
 import type * as organMatching_hardConstraints from "../organMatching/hardConstraints.js";
 import type * as organMatching_matchingPolicy from "../organMatching/matchingPolicy.js";
 import type * as organMatching_scoringEngine from "../organMatching/scoringEngine.js";
+import type * as organPreferences from "../organPreferences.js";
 import type * as organRequests from "../organRequests.js";
 import type * as patients from "../patients.js";
 import type * as recipients from "../recipients.js";
@@ -100,6 +103,7 @@ declare const fullApi: ApiFromModules<{
   consent: typeof consent;
   crons: typeof crons;
   domainConstants: typeof domainConstants;
+  donorVerification: typeof donorVerification;
   donors: typeof donors;
   "governance/consentService": typeof governance_consentService;
   "governance/privacyGate": typeof governance_privacyGate;
@@ -129,6 +133,7 @@ declare const fullApi: ApiFromModules<{
   "n8n/workflows/organAvailableWorkflow": typeof n8n_workflows_organAvailableWorkflow;
   "n8n/workflows/preservationWarningWorkflow": typeof n8n_workflows_preservationWarningWorkflow;
   "n8n/workflows/unresolvedEmergencyWorkflow": typeof n8n_workflows_unresolvedEmergencyWorkflow;
+  notifications: typeof notifications;
   "organAllocation/allocationPolicy": typeof organAllocation_allocationPolicy;
   "organAllocation/approvalWorkflow": typeof organAllocation_approvalWorkflow;
   "organAllocation/eligibilityGate": typeof organAllocation_eligibilityGate;
@@ -149,6 +154,7 @@ declare const fullApi: ApiFromModules<{
   "organMatching/hardConstraints": typeof organMatching_hardConstraints;
   "organMatching/matchingPolicy": typeof organMatching_matchingPolicy;
   "organMatching/scoringEngine": typeof organMatching_scoringEngine;
+  organPreferences: typeof organPreferences;
   organRequests: typeof organRequests;
   patients: typeof patients;
   recipients: typeof recipients;

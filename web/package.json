@@ -17,7 +17,9 @@
     "test:blockchain-trust": "tsx scripts/test-blockchain-trust.ts",
     "test:governance": "tsx scripts/test-healthcare-governance.ts",
     "test:intelligence": "tsx scripts/test-advanced-intelligence.ts",
-    "test:e2e-scenario": "tsx scripts/test-end-to-end-scenario.ts"
+    "test:e2e-scenario": "tsx scripts/test-end-to-end-scenario.ts",
+    "test:donor-verification": "tsx scripts/test-donor-verification-and-donation.ts",
+    "test:organ-requests": "tsx scripts/test-hospital-organ-requests-and-evaluations.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.8.4",

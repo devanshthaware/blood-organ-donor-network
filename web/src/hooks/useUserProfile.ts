@@ -10,6 +10,15 @@ export interface DonorProfile {
   name?: string;
   email?: string;
   bloodType?: string;
+  selfReportedBloodGroup?: string;
+  verifiedBloodGroup?: string;
+  verificationStatus?: string;
+  verifiedByHospitalId?: string;
+  verifiedByHospitalName?: string;
+  verifiedAt?: number;
+  dateOfBirth?: string;
+  contactNumber?: string;
+  healthStatus?: string;
   totalDonations?: number;
   completedDonations?: number;
   lastDonationDate?: Date | null;
@@ -47,6 +56,15 @@ export function useDonorProfile() {
         fullName: donorData.fullName,
         name: donorData.fullName,
         bloodType: donorData.bloodType,
+        selfReportedBloodGroup: donorData.selfReportedBloodGroup,
+        verifiedBloodGroup: donorData.verifiedBloodGroup,
+        verificationStatus: donorData.verificationStatus,
+        verifiedByHospitalId: donorData.verifiedByHospitalId,
+        verifiedByHospitalName: donorData.verifiedByHospitalName,
+        verifiedAt: donorData.verifiedAt,
+        dateOfBirth: donorData.dateOfBirth,
+        contactNumber: donorData.contactNumber,
+        healthStatus: donorData.healthStatus,
         completedDonations: donorData.completedDonations,
         totalDonations: donorData.completedDonations,
         lastDonationDate: donorData.lastDonationDate

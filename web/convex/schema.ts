@@ -21,6 +21,23 @@ export default defineSchema({
     userId: v.string(), // Clerk User ID or Convex User ID for flexibility
     fullName: v.string(),
     bloodType: v.string(), // "A+", "O-", etc.
+    selfReportedBloodGroup: v.optional(v.string()),
+    verifiedBloodGroup: v.optional(v.string()),
+    verificationStatus: v.optional(
+      v.union(
+        v.literal("UNVERIFIED"),
+        v.literal("PENDING"),
+        v.literal("VERIFIED"),
+        v.literal("REJECTED"),
+        v.literal("FURTHER_EVALUATION_REQUIRED")
+      )
+    ),
+    verifiedByHospitalId: v.optional(v.string()),
+    verifiedByHospitalName: v.optional(v.string()),
+    verifiedAt: v.optional(v.number()),
+    verificationNotes: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
+    contactNumber: v.optional(v.string()),
     donorStatus: v.union(v.literal("PENDING"), v.literal("APPROVED"), v.literal("REJECTED")),
     isActive: v.boolean(),
     lastDonationDate: v.optional(v.number()),
@@ -39,7 +56,8 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_bloodType", ["bloodType"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_verificationStatus", ["verificationStatus"]),
 
   hospitals: defineTable({
     userId: v.string(), // Clerk User ID or Convex User ID
@@ -362,32 +380,65 @@ export default defineSchema({
     .index("by_currentFacilityId", ["currentFacilityId"]),
 
   organRequests: defineTable({
-    requestingOrganizationId: v.string(),
-    recipientId: v.string(),
-    organType: v.string(),
-    bloodType: v.string(),
-    urgency: v.union(v.literal("LOW"), v.literal("MEDIUM"), v.literal("HIGH"), v.literal("CRITICAL")),
+    hospitalId: v.optional(v.string()),
+    hospitalName: v.optional(v.string()),
+    requestingOrganizationId: v.optional(v.string()),
+    recipientId: v.optional(v.string()),
+    createdBy: v.optional(v.string()),
+    organType: v.string(), // "KIDNEY", "LIVER_LOBE", "HEART", "LUNGS", "PANCREAS", "CORNEA", "TISSUES"
+    donationType: v.optional(v.union(v.literal("LIVING"), v.literal("DECEASED"))),
+    urgency: v.union(
+      v.literal("LOW"),
+      v.literal("MEDIUM"),
+      v.literal("HIGH"),
+      v.literal("CRITICAL"),
+      v.literal("STANDARD"),
+      v.literal("URGENT")
+    ),
+    bloodType: v.optional(v.string()),
+    requiredBloodGroup: v.optional(v.string()),
+    patientReference: v.optional(v.string()),
+    patientAge: v.optional(v.number()),
+    compatibilityCriteria: v.optional(v.string()),
+    department: v.optional(v.string()),
+    description: v.optional(v.string()),
+    requestDate: v.optional(v.number()),
+    requiredByDate: v.optional(v.number()),
+    additionalNotes: v.optional(v.string()),
+    notes: v.optional(v.string()),
     status: v.union(
       v.literal("CREATED"),
       v.literal("VERIFICATION_PENDING"),
+      v.literal("DRAFT"),
+      v.literal("PENDING_AUTHORIZATION"),
       v.literal("ACTIVE"),
       v.literal("MATCHING"),
       v.literal("MATCH_FOUND"),
+      v.literal("CANDIDATES_FOUND"),
+      v.literal("EVALUATION_IN_PROGRESS"),
+      v.literal("MATCH_CONFIRMED"),
       v.literal("ALLOCATION_PENDING"),
       v.literal("ALLOCATED"),
+      v.literal("FULFILLED"),
       v.literal("CANCELLED"),
       v.literal("EXPIRED"),
       v.literal("REJECTED"),
+      v.literal("SUSPENDED"),
       v.literal("COMPLETED")
     ),
-    notes: v.optional(v.string()),
+    authorizedBy: v.optional(v.string()),
+    authorizedAt: v.optional(v.number()),
+    legalConfirmation: v.optional(v.boolean()),
+    eligibleCandidatesCount: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_status", ["status"])
     .index("by_organType", ["organType"])
     .index("by_recipientId", ["recipientId"])
-    .index("by_orgId", ["requestingOrganizationId"]),
+    .index("by_orgId", ["requestingOrganizationId"])
+    .index("by_hospitalId", ["hospitalId"])
+    .index("by_hospitalId_status", ["hospitalId", "status"]),
 
   organMatches: defineTable({
     organId: v.string(),
@@ -1039,4 +1090,162 @@ export default defineSchema({
   })
     .index("by_scenarioType", ["scenarioType"])
     .index("by_createdAt", ["createdAt"]),
+
+  // ==========================================
+  // DONOR VERIFICATION & WORKFLOW MODULE
+  // ==========================================
+
+  donorVerificationRequests: defineTable({
+    donorId: v.string(),
+    donorUserId: v.string(),
+    donorName: v.string(),
+    donorAge: v.optional(v.number()),
+    donorContact: v.optional(v.string()),
+    donorAddress: v.optional(v.string()),
+    selfReportedBloodGroup: v.optional(v.string()),
+    appointmentDate: v.optional(v.string()),
+    appointmentTimeSlot: v.optional(v.string()),
+    hospitalId: v.string(),
+    hospitalName: v.string(),
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("APPROVED"),
+      v.literal("REJECTED"),
+      v.literal("FURTHER_EVALUATION_REQUIRED"),
+      v.literal("CANCELLED")
+    ),
+    submittedAt: v.number(),
+    reviewedAt: v.optional(v.number()),
+    reviewedBy: v.optional(v.string()),
+    verifiedBloodGroup: v.optional(v.string()),
+    rejectionReason: v.optional(v.string()),
+    medicalNotes: v.optional(v.string()),
+  })
+    .index("by_hospitalId", ["hospitalId"])
+    .index("by_hospitalId_status", ["hospitalId", "status"])
+    .index("by_donorUserId", ["donorUserId"])
+    .index("by_status", ["status"]),
+
+  organDonationPreferences: defineTable({
+    donorId: v.string(),
+    donorUserId: v.string(),
+    organType: v.string(), // "KIDNEY", "LIVER", "HEART", "LUNGS", "PANCREAS", "INTESTINE", "CORNEA", "TISSUE"
+    donationType: v.union(v.literal("LIVING"), v.literal("DECEASED")),
+    preferenceStatus: v.union(v.literal("INTERESTED"), v.literal("PLEDGED"), v.literal("WITHDRAWN")),
+    eligibilityStatus: v.union(
+      v.literal("NOT_EVALUATED"),
+      v.literal("PENDING"),
+      v.literal("ELIGIBLE"),
+      v.literal("INELIGIBLE"),
+      v.literal("FURTHER_EVALUATION_REQUIRED"),
+      v.literal("NOT_APPLICABLE")
+    ),
+    evaluatedByHospitalId: v.optional(v.string()),
+    evaluatedByHospitalName: v.optional(v.string()),
+    evaluatedAt: v.optional(v.number()),
+    evaluationNotes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_donorUserId", ["donorUserId"])
+    .index("by_donor_organ", ["donorUserId", "organType"])
+    .index("by_organType", ["organType"])
+    .index("by_eligibilityStatus", ["eligibilityStatus"]),
+
+  organEvaluationRequests: defineTable({
+    donorId: v.string(),
+    donorUserId: v.string(),
+    donorName: v.string(),
+    donorContact: v.optional(v.string()),
+    donorAddress: v.optional(v.string()),
+    bloodGroup: v.optional(v.string()),
+    appointmentDate: v.optional(v.string()),
+    appointmentTimeSlot: v.optional(v.string()),
+    hospitalId: v.string(),
+    hospitalName: v.string(),
+    organType: v.string(),
+    donationType: v.union(v.literal("LIVING"), v.literal("DECEASED")),
+    status: v.union(
+      v.literal("PENDING"),
+      v.literal("APPROVED"),
+      v.literal("REJECTED"),
+      v.literal("FURTHER_EVALUATION_REQUIRED"),
+      v.literal("CANCELLED")
+    ),
+    requestedAt: v.number(),
+    evaluatedAt: v.optional(v.number()),
+    evaluatedBy: v.optional(v.string()),
+    decision: v.optional(v.string()),
+    rejectionReason: v.optional(v.string()),
+    medicalNotes: v.optional(v.string()),
+  })
+    .index("by_hospitalId", ["hospitalId"])
+    .index("by_hospitalId_status", ["hospitalId", "status"])
+    .index("by_donorUserId", ["donorUserId"])
+    .index("by_donor_organ", ["donorUserId", "organType"])
+    .index("by_status", ["status"]),
+
+  organCandidates: defineTable({
+    organRequestId: v.string(),
+    hospitalId: v.string(),
+    hospitalName: v.optional(v.string()),
+    donorId: v.string(),
+    donorUserId: v.string(),
+    donorName: v.string(),
+    donorBloodGroup: v.string(),
+    organType: v.string(),
+    donationType: v.union(v.literal("LIVING"), v.literal("DECEASED")),
+    urgency: v.string(),
+    patientReference: v.optional(v.string()),
+    matchScore: v.number(),
+    matchStatus: v.union(
+      v.literal("POTENTIAL_MATCH"),
+      v.literal("CONFIRMED_MATCH"),
+      v.literal("INCOMPATIBLE"),
+      v.literal("REJECTED")
+    ),
+    donorResponse: v.union(v.literal("PENDING"), v.literal("INTERESTED"), v.literal("DECLINED")),
+    donorRespondedAt: v.optional(v.number()),
+    evaluationStatus: v.union(
+      v.literal("PENDING"),
+      v.literal("ASSIGNED"),
+      v.literal("IN_EVALUATION"),
+      v.literal("FURTHER_EVALUATION_REQUIRED"),
+      v.literal("ELIGIBLE"),
+      v.literal("INELIGIBLE"),
+      v.literal("WITHDRAWN"),
+      v.literal("COMPLETED")
+    ),
+    assignedReviewer: v.optional(v.string()),
+    assignedDoctorName: v.optional(v.string()),
+    assignedAt: v.optional(v.number()),
+    medicalAssessment: v.optional(v.string()),
+    diagnosticNotes: v.optional(v.string()),
+    additionalEvaluationRequired: v.optional(v.string()),
+    evaluatedBy: v.optional(v.string()),
+    evaluatedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_organRequestId", ["organRequestId"])
+    .index("by_donorUserId", ["donorUserId"])
+    .index("by_hospitalId", ["hospitalId"])
+    .index("by_evaluationStatus", ["evaluationStatus"])
+    .index("by_hospital_evalStatus", ["hospitalId", "evaluationStatus"])
+    .index("by_donor_response", ["donorUserId", "donorResponse"]),
+
+  notifications: defineTable({
+    userId: v.string(),
+    userRole: v.optional(v.union(v.literal("donor"), v.literal("hospital"), v.literal("admin"))),
+    title: v.string(),
+    message: v.string(),
+    type: v.string(),
+    relatedEntityId: v.optional(v.string()),
+    relatedEntityType: v.optional(v.string()),
+    isRead: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_isRead", ["userId", "isRead"])
+    .index("by_userId_createdAt", ["userId", "createdAt"]),
 });
