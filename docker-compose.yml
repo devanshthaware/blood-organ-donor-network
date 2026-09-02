@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  # Next.js Web Frontend & Dashboard
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_ML_API_URL=http://ml-service:8000
+      - NEXT_PUBLIC_N8N_WEBHOOK_URL=http://n8n:5678
+    depends_on:
+      - ml-service
+    restart: unless-stopped
+
+  # FastAPI Machine Learning & CV Inference Service
+  ml-service:
+    build:
+      context: ./ml-backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - LOG_LEVEL=INFO
+      - MODEL_VERSION=2.1.0
+    restart: unless-stopped
+
+  # n8n Workflow Automation Sandbox
+  n8n:
+    image: n8nio/n8n:latest
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=false
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+    restart: unless-stopped
+
+volumes:
+  n8n_data:

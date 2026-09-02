@@ -1,0 +1,80 @@
+name: VeinLink CI/CD Quality Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  validate:
+    name: Lint, Typecheck & Multi-Domain Test Suites
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install Dependencies
+        working-directory: ./web
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript Static Typecheck
+        working-directory: ./web
+        run: pnpm exec tsc --noEmit
+
+      - name: Migration Invariant Verification
+        working-directory: ./web
+        run: pnpm verify:migration
+
+      - name: Organ Domain Test Suite
+        working-directory: ./web
+        run: pnpm test:organ-domain
+
+      - name: Organ Matching Test Suite
+        working-directory: ./web
+        run: pnpm test:organ-matching
+
+      - name: Organ Allocation Test Suite
+        working-directory: ./web
+        run: pnpm test:organ-allocation
+
+      - name: Organ Logistics Test Suite
+        working-directory: ./web
+        run: pnpm test:organ-logistics
+
+      - name: Computer Vision & OCR Test Suite
+        working-directory: ./web
+        run: pnpm test:cv-verification
+
+      - name: n8n Workflow Automation Test Suite
+        working-directory: ./web
+        run: pnpm test:n8n-automation
+
+      - name: Blockchain Trust & Provenance Test Suite
+        working-directory: ./web
+        run: pnpm test:blockchain-trust
+
+      - name: Healthcare Security & Governance Test Suite
+        working-directory: ./web
+        run: pnpm test:governance
+
+      - name: Advanced AI & Network Intelligence Test Suite
+        working-directory: ./web
+        run: pnpm test:intelligence
+
+      - name: End-to-End Synthetic Scenario Test Suite
+        working-directory: ./web
+        run: pnpm test:e2e-scenario

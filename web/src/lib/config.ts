@@ -1,38 +1,29 @@
 /**
- * Application Configuration
- * All configurable values should be here, not hardcoded in components
+ * VeinLink Application Configuration
+ * All configurable values and service endpoints
  */
 
-// Emulator Configuration
-export const EMULATOR_CONFIG = {
-  auth: {
-    host: process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST || "localhost",
-    port: parseInt(process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_PORT || "9099", 10),
-    get url() {
-      return `http://${this.host}:${this.port}`;
-    },
+// Core Services Configuration
+export const SERVICES_CONFIG = {
+  convex: {
+    url: process.env.NEXT_PUBLIC_CONVEX_URL || "",
   },
-  firestore: {
-    host: process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST || "localhost",
-    port: parseInt(process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR_PORT || "8080", 10),
+  clerk: {
+    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "",
   },
-  ui: {
-    host: process.env.NEXT_PUBLIC_EMULATOR_UI_HOST || "localhost",
-    port: parseInt(process.env.NEXT_PUBLIC_EMULATOR_UI_PORT || "4000", 10),
-    get url() {
-      return `http://${this.host}:${this.port}`;
-    },
+  mlApi: {
+    url: process.env.NEXT_PUBLIC_ML_API_URL || "http://localhost:8000",
+    timeout: parseInt(process.env.NEXT_PUBLIC_ML_API_TIMEOUT || "30000", 10),
+  },
+  n8n: {
+    webhookUrl: process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || "http://localhost:5678",
   },
 } as const;
 
-// ML API Configuration
-export const ML_API_CONFIG = {
-  url: process.env.NEXT_PUBLIC_ML_API_URL || "",
-  timeout: parseInt(process.env.NEXT_PUBLIC_ML_API_TIMEOUT || "30000", 10),
-} as const;
-
-// App Configuration
+// App Runtime Configuration
 export const APP_CONFIG = {
+  name: "VeinLink",
+  version: "2.1.0-hackathon-final",
   isDevelopment: process.env.NODE_ENV === "development",
   isProduction: process.env.NODE_ENV === "production",
 } as const;

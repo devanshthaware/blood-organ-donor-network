@@ -16,7 +16,8 @@
     "test:n8n-automation": "tsx scripts/test-n8n-automation.ts",
     "test:blockchain-trust": "tsx scripts/test-blockchain-trust.ts",
     "test:governance": "tsx scripts/test-healthcare-governance.ts",
-    "test:intelligence": "tsx scripts/test-advanced-intelligence.ts"
+    "test:intelligence": "tsx scripts/test-advanced-intelligence.ts",
+    "test:e2e-scenario": "tsx scripts/test-end-to-end-scenario.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.8.4",
