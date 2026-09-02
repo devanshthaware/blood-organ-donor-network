@@ -490,4 +490,221 @@ export default defineSchema({
     .index("by_hospitalId", ["hospitalId"])
     .index("by_region", ["region"])
     .index("by_active", ["isActive"]),
+
+  // ==========================================
+  // LOGISTICS & TRANSPORT ENTITIES (STEP 6)
+  // ==========================================
+
+  transportRequests: defineTable({
+    allocationId: v.string(),
+    organId: v.string(),
+    originFacilityId: v.string(),
+    destinationFacilityId: v.string(),
+    priority: v.union(
+      v.literal("ROUTINE"),
+      v.literal("URGENT"),
+      v.literal("CRITICAL_EMERGENCY")
+    ),
+    status: v.union(
+      v.literal("CREATED"),
+      v.literal("PLANNING"),
+      v.literal("READY"),
+      v.literal("ASSIGNED"),
+      v.literal("PICKUP_PENDING"),
+      v.literal("IN_TRANSIT"),
+      v.literal("ARRIVED"),
+      v.literal("DELIVERED"),
+      v.literal("CONFIRMED"),
+      v.literal("CANCELLED"),
+      v.literal("DELAYED"),
+      v.literal("FAILED"),
+      v.literal("EXPIRED")
+    ),
+    selectedTransportOptionId: v.optional(v.string()),
+    assignedCarrier: v.optional(v.string()),
+    trackingCode: v.string(),
+    preservationDeadline: v.number(),
+    estimatedArrival: v.optional(v.number()),
+    feasibility: v.union(
+      v.literal("FEASIBLE"),
+      v.literal("RISKY"),
+      v.literal("INFEASIBLE"),
+      v.literal("UNKNOWN")
+    ),
+    riskLevel: v.union(
+      v.literal("LOW"),
+      v.literal("MODERATE"),
+      v.literal("HIGH"),
+      v.literal("CRITICAL"),
+      v.literal("EXPIRED")
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_allocationId", ["allocationId"])
+    .index("by_organId", ["organId"])
+    .index("by_status", ["status"])
+    .index("by_riskLevel", ["riskLevel"]),
+
+  transportOptions: defineTable({
+    transportRequestId: v.string(),
+    mode: v.union(
+      v.literal("ROAD_AMBULANCE"),
+      v.literal("AIR_CHARTER"),
+      v.literal("COMMERCIAL_AIR"),
+      v.literal("SPECIALIZED_MEDICAL_COURIER")
+    ),
+    provider: v.string(),
+    estimatedDurationMinutes: v.number(),
+    estimatedArrival: v.number(),
+    safetyBufferMinutes: v.number(),
+    feasibility: v.union(
+      v.literal("FEASIBLE"),
+      v.literal("RISKY"),
+      v.literal("INFEASIBLE"),
+      v.literal("UNKNOWN")
+    ),
+    riskLevel: v.union(
+      v.literal("LOW"),
+      v.literal("MODERATE"),
+      v.literal("HIGH"),
+      v.literal("CRITICAL")
+    ),
+    isRecommended: v.boolean(),
+    isSimulation: v.boolean(),
+    calculatedAt: v.number(),
+  })
+    .index("by_transportRequestId", ["transportRequestId"])
+    .index("by_mode", ["mode"]),
+
+  transportEvents: defineTable({
+    transportRequestId: v.string(),
+    eventType: v.union(
+      v.literal("CREATED"),
+      v.literal("PLANNING_STARTED"),
+      v.literal("ROUTE_CALCULATED"),
+      v.literal("TRANSPORT_ASSIGNED"),
+      v.literal("PICKUP_STARTED"),
+      v.literal("PICKUP_COMPLETED"),
+      v.literal("DEPARTED"),
+      v.literal("CHECKPOINT_REACHED"),
+      v.literal("DELAY_DETECTED"),
+      v.literal("ARRIVED"),
+      v.literal("DELIVERED"),
+      v.literal("DELIVERY_CONFIRMED"),
+      v.literal("TRANSPORT_CANCELLED")
+    ),
+    actorId: v.string(),
+    actorRole: v.string(),
+    timestamp: v.number(),
+    locationDescription: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  })
+    .index("by_transportRequestId", ["transportRequestId"])
+    .index("by_timestamp", ["timestamp"]),
+
+  logisticsAlerts: defineTable({
+    transportRequestId: v.string(),
+    organId: v.string(),
+    alertType: v.union(
+      v.literal("ETA_RISK"),
+      v.literal("TRANSPORT_DELAY"),
+      v.literal("DEADLINE_APPROACHING"),
+      v.literal("DEADLINE_EXCEEDED"),
+      v.literal("ROUTE_FAILURE"),
+      v.literal("NO_TRANSPORT")
+    ),
+    severity: v.union(
+      v.literal("LOW"),
+      v.literal("MEDIUM"),
+      v.literal("HIGH"),
+      v.literal("CRITICAL")
+    ),
+    message: v.string(),
+    status: v.union(
+      v.literal("ACTIVE"),
+      v.literal("ACKNOWLEDGED"),
+      v.literal("RESOLVED")
+    ),
+    detectedAt: v.number(),
+    acknowledgedBy: v.optional(v.string()),
+    acknowledgedAt: v.optional(v.number()),
+    resolvedAt: v.optional(v.number()),
+  })
+    .index("by_transportRequestId", ["transportRequestId"])
+    .index("by_status", ["status"])
+    .index("by_severity", ["severity"]),
+
+  // ==========================================
+  // COMPUTER VISION & OCR VERIFICATION (STEP 7)
+  // ==========================================
+
+  verificationRequests: defineTable({
+    entityType: v.union(
+      v.literal("BLOOD_UNIT"),
+      v.literal("ORGAN"),
+      v.literal("DONOR"),
+      v.literal("RECIPIENT"),
+      v.literal("TRANSPORT"),
+      v.literal("DOCUMENT")
+    ),
+    entityId: v.string(),
+    verificationType: v.union(
+      v.literal("BLOOD_LABEL_VERIFICATION"),
+      v.literal("ORGAN_IDENTIFIER_VERIFICATION"),
+      v.literal("BARCODE_SCAN"),
+      v.literal("DOCUMENT_OCR"),
+      v.literal("PACKAGE_VERIFICATION")
+    ),
+    imageReference: v.string(),
+    imageQuality: v.optional(
+      v.object({
+        isUsable: v.boolean(),
+        blurScore: v.number(),
+        resolution: v.string(),
+        warnings: v.array(v.string()),
+      })
+    ),
+    extractedData: v.optional(v.any()),
+    authoritativeSnapshot: v.any(),
+    comparisonResult: v.optional(
+      v.object({
+        status: v.union(
+          v.literal("MATCH"),
+          v.literal("PARTIAL_MATCH"),
+          v.literal("MISMATCH"),
+          v.literal("REVIEW_REQUIRED")
+        ),
+        confidence: v.number(),
+        mismatches: v.array(
+          v.object({
+            field: v.string(),
+            expected: v.string(),
+            observed: v.string(),
+            severity: v.string(),
+          })
+        ),
+        explanation: v.string(),
+      })
+    ),
+    status: v.union(
+      v.literal("UPLOADED"),
+      v.literal("PROCESSING"),
+      v.literal("EXTRACTED"),
+      v.literal("REVIEW_REQUIRED"),
+      v.literal("VERIFIED"),
+      v.literal("REJECTED"),
+      v.literal("FAILED")
+    ),
+    reviewedBy: v.optional(v.string()),
+    reviewDecision: v.optional(v.string()),
+    reviewReason: v.optional(v.string()),
+    engine: v.string(),
+    engineVersion: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_entityType_entityId", ["entityType", "entityId"])
+    .index("by_status", ["status"])
+    .index("by_createdAt", ["createdAt"]),
 });

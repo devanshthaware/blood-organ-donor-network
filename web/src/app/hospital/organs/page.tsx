@@ -25,14 +25,28 @@ import {
     Search,
     Scale,
     SlidersHorizontal,
+    Truck,
+    Plane,
+    MapPin,
+    Timer,
+    AlertOctagon,
+    Send,
+    Scan,
+    FileCheck,
+    Eye,
 } from "lucide-react"
 
 export default function HospitalOrgansPage() {
     const [activeTab, setActiveTab] = useState("inventory")
     const [selectedOrganId, setSelectedOrganId] = useState<string | null>(null)
+    const [selectedTransportId, setSelectedTransportId] = useState<string | null>(null)
+    const [selectedVerificationId, setSelectedVerificationId] = useState<string | null>(null)
     const [isMatchingRunning, setIsMatchingRunning] = useState(false)
     const [isOptimizingRunning, setIsOptimizingRunning] = useState(false)
+    const [isCreatingTransport, setIsCreatingTransport] = useState(false)
+    const [isScanning, setIsScanning] = useState(false)
 
+    // Step 3 & 4 queries
     const inventory = useQuery((api as any).organInventory?.getAllOrganInventory, {}) || []
     const recipients = useQuery((api as any).recipients?.getAllRecipients, {}) || []
     const requests = useQuery((api as any).organRequests?.getAllOrganRequests, {}) || []
@@ -43,6 +57,7 @@ export default function HospitalOrgansPage() {
         selectedOrganId ? { organId: selectedOrganId } : "skip"
     ) || []
 
+    // Step 5 queries & mutations
     const activeRecommendations = useQuery(
         (api as any).organAllocations?.getRecommendationsForOrgan,
         selectedOrganId ? { organId: selectedOrganId } : "skip"
@@ -57,6 +72,54 @@ export default function HospitalOrgansPage() {
     )
     const rejectWithReasonMutation = useMutation(
         (api as any).organAllocations?.rejectAllocationWithReason
+    )
+
+    // Step 6 logistics queries & actions
+    const transportRequests = useQuery(
+        (api as any).organLogistics?.logisticsOrchestrator?.getTransportRequests,
+        {}
+    ) || []
+
+    const transportDetails = useQuery(
+        (api as any).organLogistics?.logisticsOrchestrator?.getTransportDetails,
+        selectedTransportId ? { transportRequestId: selectedTransportId } : "skip"
+    )
+
+    const createTransportPlanAction = useAction(
+        (api as any).organLogistics?.logisticsOrchestrator?.createTransportPlanAction
+    )
+    const assignTransportMutation = useMutation(
+        (api as any).organLogistics?.logisticsOrchestrator?.assignTransportOption
+    )
+    const updateTransportStatusMutation = useMutation(
+        (api as any).organLogistics?.logisticsOrchestrator?.updateTransportStatus
+    )
+    const reportDelayMutation = useMutation(
+        (api as any).organLogistics?.logisticsOrchestrator?.reportTransportDelay
+    )
+    const acknowledgeAlertMutation = useMutation(
+        (api as any).organLogistics?.logisticsOrchestrator?.acknowledgeLogisticsAlert
+    )
+
+    // Step 7 CV & OCR verification queries & actions
+    const verificationRequests = useQuery(
+        (api as any).verification?.verificationService?.getAllVerificationRequests,
+        {}
+    ) || []
+
+    const selectedVerificationRequest = useQuery(
+        (api as any).verification?.verificationService?.getVerificationRequestById,
+        selectedVerificationId ? { verificationRequestId: selectedVerificationId } : "skip"
+    )
+
+    const createVerificationRequestMutation = useMutation(
+        (api as any).verification?.verificationService?.createVerificationRequest
+    )
+    const runVerificationAction = useAction(
+        (api as any).verification?.actions?.runVerificationAction
+    )
+    const submitHumanReviewMutation = useMutation(
+        (api as any).verification?.verificationService?.submitHumanReview
     )
 
     const handleRunMatching = async (organId: string) => {
@@ -151,6 +214,145 @@ export default function HospitalOrgansPage() {
         }
     }
 
+    // Step 6 Logistics Actions
+    const handleInitiateTransport = async (allocationId: string) => {
+        setIsCreatingTransport(true)
+        try {
+            const result = await createTransportPlanAction({ allocationId })
+            alert(`Transport Plan created! Generated ${result.optionsGenerated} multi-modal route options.`)
+            setSelectedTransportId(result.transportRequestId)
+            setActiveTab("logistics")
+        } catch (err: any) {
+            alert(err?.message || "Failed to initialize transport plan.")
+        } finally {
+            setIsCreatingTransport(false)
+        }
+    }
+
+    const handleAssignCarrier = async (optionId: string, defaultCarrier: string) => {
+        if (!selectedTransportId) return
+        const carrier = prompt("Confirm assigned medical transport carrier:", defaultCarrier)
+        if (!carrier) return
+
+        try {
+            await assignTransportMutation({
+                transportRequestId: selectedTransportId as any,
+                transportOptionId: optionId as any,
+                assignedCarrier: carrier,
+            })
+            alert("Transport option assigned and status advanced to ASSIGNED.")
+        } catch (err: any) {
+            alert(err?.message || "Failed to assign transport carrier.")
+        }
+    }
+
+    const handleUpdateMilestone = async (targetStatus: any, defaultLocation: string) => {
+        if (!selectedTransportId) return
+        const location = prompt("Enter verified milestone location:", defaultLocation)
+        if (!location) return
+
+        try {
+            await updateTransportStatusMutation({
+                transportRequestId: selectedTransportId as any,
+                targetStatus,
+                locationDescription: location,
+            })
+            alert(`Transport progress updated: status is now ${targetStatus}.`)
+        } catch (err: any) {
+            alert(err?.message || "Failed to update transport progress.")
+        }
+    }
+
+    const handleReportDelay = async () => {
+        if (!selectedTransportId) return
+        const minutesStr = prompt("Enter delay in minutes from planned schedule:", "35")
+        if (!minutesStr) return
+        const delayMinutes = parseInt(minutesStr, 10)
+        if (isNaN(delayMinutes) || delayMinutes <= 0) return
+
+        const reason = prompt("Enter operational reason for delay:", "Air traffic ground hold / Adverse weather")
+        if (!reason) return
+
+        try {
+            const res = await reportDelayMutation({
+                transportRequestId: selectedTransportId as any,
+                delayMinutes,
+                reason,
+            })
+            if (res.isCriticalToDeadline) {
+                alert(`WARNING: Delay of ${delayMinutes} mins threatens preservation deadline! Critical alert dispatched to coordinator.`)
+            } else {
+                alert(`Transport delay of ${delayMinutes} mins recorded and schedule updated.`)
+            }
+        } catch (err: any) {
+            alert(err?.message || "Failed to report transport delay.")
+        }
+    }
+
+    const handleAcknowledgeAlert = async (alertId: string) => {
+        try {
+            await acknowledgeAlertMutation({ alertId: alertId as any })
+            alert("Logistics alert acknowledged.")
+        } catch (err: any) {
+            alert(err?.message || "Failed to acknowledge alert.")
+        }
+    }
+
+    // Step 7 CV & OCR Verification Actions
+    const handleInitiateScan = async (organ: any, scenario: "MATCH" | "MISMATCH" | "BLURRY") => {
+        setIsScanning(true)
+        try {
+            let labelText = `VEINLINK ORGAN SPECIMEN LABEL\nIdentifier: ${organ._id.substring(0, 10)}\nOrgan Type: ${organ.organType}\nBlood Group: ${organ.bloodType}\nFacility: ${organ.currentFacilityId}`
+            if (scenario === "MISMATCH") {
+                labelText = `VEINLINK ORGAN SPECIMEN LABEL\nIdentifier: ${organ._id.substring(0, 10)}\nOrgan Type: ${organ.organType}\nBlood Group: AB+\nFacility: ${organ.currentFacilityId}`
+            } else if (scenario === "BLURRY") {
+                labelText = `BLURRY UNREADABLE SPECIMEN SCAN`
+            }
+
+            const reqId = await createVerificationRequestMutation({
+                entityType: "ORGAN",
+                entityId: organ._id,
+                verificationType: "ORGAN_IDENTIFIER_VERIFICATION",
+                imageReference: labelText,
+                authoritativeSnapshot: {
+                    identifier: organ._id.substring(0, 10),
+                    organ_type: organ.organType,
+                    blood_group: organ.bloodType,
+                    facility: organ.currentFacilityId,
+                },
+            })
+
+            setSelectedVerificationId(reqId)
+            const result = await runVerificationAction({ verificationRequestId: reqId })
+            alert(`OCR & Vision analysis complete: ${result.comparisonStatus} (Confidence: ${Math.round(result.confidence * 100)}%)`)
+            setActiveTab("verification")
+        } catch (err: any) {
+            alert(err?.message || "Failed to process verification scan.")
+        } finally {
+            setIsScanning(false)
+        }
+    }
+
+    const handleSubmitVerificationReview = async (decision: "VERIFIED" | "REJECTED" | "RETRY_REQUESTED") => {
+        if (!selectedVerificationId) return
+        const reason = prompt(
+            `Enter clinical verification notes for decision [${decision}]:`,
+            decision === "VERIFIED" ? "Visual inspection confirms physical package label matches digital record." : "Field discrepancy confirmed by coordinator."
+        )
+        if (!reason) return
+
+        try {
+            await submitHumanReviewMutation({
+                verificationRequestId: selectedVerificationId as any,
+                decision,
+                reason,
+            })
+            alert(`Verification decision [${decision}] recorded in permanent audit trail.`)
+        } catch (err: any) {
+            alert(err?.message || "Failed to submit verification review.")
+        }
+    }
+
     const formatRemainingPreservation = (deadline: number) => {
         const diffMs = deadline - Date.now()
         if (diffMs <= 0) return <span className="text-red-500 font-semibold">Expired</span>
@@ -171,12 +373,12 @@ export default function HospitalOrgansPage() {
                     <h2 className="text-3xl font-bold tracking-tight">Organ Donor Network</h2>
                 </div>
                 <p className="text-muted-foreground mt-1">
-                    Multi-objective optimization, candidate recommendations, and authorized human governance.
+                    Multi-objective optimization, candidate recommendations, time-critical logistics, and physical-to-digital CV verification.
                 </p>
             </div>
 
             {/* Metric Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-5">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Available Organs</CardTitle>
@@ -186,7 +388,7 @@ export default function HospitalOrgansPage() {
                         <div className="text-2xl font-bold">
                             {inventory.filter((o: any) => o.status === "AVAILABLE").length}
                         </div>
-                        <p className="text-xs text-muted-foreground">Viable within cold ischemia clock</p>
+                        <p className="text-xs text-muted-foreground">Viable preservation window</p>
                     </CardContent>
                 </Card>
 
@@ -199,7 +401,7 @@ export default function HospitalOrgansPage() {
                         <div className="text-2xl font-bold">
                             {recipients.filter((r: any) => r.recipientStatus === "ACTIVE").length}
                         </div>
-                        <p className="text-xs text-muted-foreground">Active transplant candidates</p>
+                        <p className="text-xs text-muted-foreground">Active candidates</p>
                     </CardContent>
                 </Card>
 
@@ -212,7 +414,7 @@ export default function HospitalOrgansPage() {
                         <div className="text-2xl font-bold">
                             {requests.filter((req: any) => req.status === "ACTIVE" || req.status === "MATCHING").length}
                         </div>
-                        <p className="text-xs text-muted-foreground">Matching or pending allocation</p>
+                        <p className="text-xs text-muted-foreground">Matching in progress</p>
                     </CardContent>
                 </Card>
 
@@ -225,25 +427,46 @@ export default function HospitalOrgansPage() {
                         <div className="text-2xl font-bold">
                             {allocations.filter((a: any) => a.decisionStatus === "APPROVED").length}
                         </div>
-                        <p className="text-xs text-muted-foreground">Formally approved by coordinators</p>
+                        <p className="text-xs text-muted-foreground">Coordinator approved</p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium">Physical Verifications</CardTitle>
+                        <Scan className="h-4 w-4 text-cyan-500" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">
+                            {verificationRequests.filter((v: any) => v.status === "VERIFIED").length}
+                        </div>
+                        <p className="text-xs text-muted-foreground">CV/OCR verified items</p>
                     </CardContent>
                 </Card>
             </div>
 
             {/* Navigation Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+                <TabsList className="grid grid-cols-7 w-full max-w-5xl">
                     <TabsTrigger value="inventory" className="flex items-center gap-1.5">
                         <Heart className="h-4 w-4" />
                         <span>Inventory</span>
                     </TabsTrigger>
                     <TabsTrigger value="matches" className="flex items-center gap-1.5">
                         <Sparkles className="h-4 w-4 text-amber-500" />
-                        <span>Candidate Matches</span>
+                        <span>Matches</span>
                     </TabsTrigger>
                     <TabsTrigger value="allocations" className="flex items-center gap-1.5">
                         <Scale className="h-4 w-4 text-purple-500" />
-                        <span>Allocation Review</span>
+                        <span>Allocations</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="logistics" className="flex items-center gap-1.5">
+                        <Truck className="h-4 w-4 text-emerald-500" />
+                        <span>Logistics</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="verification" className="flex items-center gap-1.5">
+                        <Scan className="h-4 w-4 text-cyan-500" />
+                        <span>Verification</span>
                     </TabsTrigger>
                     <TabsTrigger value="recipients" className="flex items-center gap-1.5">
                         <Users className="h-4 w-4" />
@@ -261,7 +484,7 @@ export default function HospitalOrgansPage() {
                         <CardHeader>
                             <CardTitle>Identified & Available Organs</CardTitle>
                             <CardDescription>
-                                Tracked organs with active preservation clocks. Run matching or optimize multi-objective allocation recommendations.
+                                Tracked organs with active preservation clocks. Run matching, optimize allocation, or scan physical label.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -326,10 +549,19 @@ export default function HospitalOrgansPage() {
                                                                 className="bg-purple-600 hover:bg-purple-700 text-white"
                                                                 onClick={() => handleGenerateRecommendations(organ._id)}
                                                             >
-                                                                <Scale className="h-3.5 w-3.5 mr-1" /> Optimize Allocation
+                                                                <Scale className="h-3.5 w-3.5 mr-1" /> Optimize
                                                             </Button>
                                                         </>
                                                     )}
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="text-cyan-500 border-cyan-500 hover:bg-cyan-500/10"
+                                                        onClick={() => handleInitiateScan(organ, "MATCH")}
+                                                        disabled={isScanning}
+                                                    >
+                                                        <Scan className="h-3.5 w-3.5 mr-1" /> Verify Label
+                                                    </Button>
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -415,9 +647,8 @@ export default function HospitalOrgansPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 3: Allocations Review & Governance (Step 5 Core UI) */}
+                {/* Tab 3: Allocations Review & Governance */}
                 <TabsContent value="allocations" className="space-y-4">
-                    {/* Active Recommendations Multi-Candidate Comparison */}
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
@@ -459,7 +690,6 @@ export default function HospitalOrgansPage() {
                                 </div>
                             ) : (
                                 <div className="space-y-6">
-                                    {/* Multi-Candidate Comparison Table */}
                                     <div className="rounded-md border">
                                         <Table>
                                             <TableHeader>
@@ -550,47 +780,17 @@ export default function HospitalOrgansPage() {
                                             </TableBody>
                                         </Table>
                                     </div>
-
-                                    {/* Recommendation Explanations */}
-                                    <div className="grid md:grid-cols-2 gap-4">
-                                        {activeRecommendations.map((rec: any) => (
-                                            <Card key={rec._id} className="text-xs">
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-sm flex items-center justify-between">
-                                                        <span>Recommendation Profile: Rank #{rec.rank}</span>
-                                                        <Badge variant="outline">{rec.policyVersion}</Badge>
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-2">
-                                                    <p className="font-medium text-foreground">{rec.explanation}</p>
-                                                    <div className="pt-2 border-t space-y-1 text-muted-foreground">
-                                                        <div>• Urgency Contribution: +{rec.objectiveBreakdown?.urgencyContribution}</div>
-                                                        <div>• Waitlist Contribution: +{rec.objectiveBreakdown?.waitlistContribution}</div>
-                                                        <div>• Logistics Contribution: +{rec.objectiveBreakdown?.logisticsContribution}</div>
-                                                        <div>• Preservation Contribution: +{rec.objectiveBreakdown?.preservationContribution}</div>
-                                                    </div>
-                                                    {rec.warnings && rec.warnings.length > 0 && (
-                                                        <div className="pt-2 border-t text-amber-500 space-y-0.5">
-                                                            {rec.warnings.map((w: string, i: number) => (
-                                                                <div key={i}>⚠ {w}</div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                </CardContent>
-                                            </Card>
-                                        ))}
-                                    </div>
                                 </div>
                             )}
                         </CardContent>
                     </Card>
 
-                    {/* Authorized Allocation Records (History) */}
+                    {/* Authorized Allocation Records with Dispatch Action */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Authorized Allocation Records</CardTitle>
                             <CardDescription>
-                                Immutable history of coordinator-authorized organ allocations.
+                                Immutable history of coordinator-authorized organ allocations with dispatch handoff.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -599,10 +799,10 @@ export default function HospitalOrgansPage() {
                                     <TableRow>
                                         <TableHead>Audit Reference</TableHead>
                                         <TableHead>Organ ID</TableHead>
-                                        <TableHead>Recipient ID</TableHead>
                                         <TableHead>Decision</TableHead>
-                                        <TableHead>Coordinator Justification</TableHead>
+                                        <TableHead>Justification</TableHead>
                                         <TableHead>Approved At</TableHead>
+                                        <TableHead className="text-right">Logistics Dispatch</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -619,7 +819,6 @@ export default function HospitalOrgansPage() {
                                                     {alloc.auditReference}
                                                 </TableCell>
                                                 <TableCell className="font-mono text-xs">{alloc.organId.substring(0, 8)}...</TableCell>
-                                                <TableCell className="font-mono text-xs">{alloc.recipientId.substring(0, 8)}...</TableCell>
                                                 <TableCell>
                                                     <Badge
                                                         variant={
@@ -637,6 +836,18 @@ export default function HospitalOrgansPage() {
                                                 <TableCell className="text-xs text-muted-foreground">
                                                     {alloc.approvedAt ? new Date(alloc.approvedAt).toLocaleString() : "N/A"}
                                                 </TableCell>
+                                                <TableCell className="text-right">
+                                                    {alloc.decisionStatus === "APPROVED" && (
+                                                        <Button
+                                                            size="sm"
+                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                            onClick={() => handleInitiateTransport(alloc._id)}
+                                                            disabled={isCreatingTransport}
+                                                        >
+                                                            <Truck className="h-3.5 w-3.5 mr-1" /> Dispatch Logistics
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
                                             </TableRow>
                                         ))
                                     )}
@@ -646,7 +857,490 @@ export default function HospitalOrgansPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 4: Recipients */}
+                {/* Tab 4: Logistics & Transport */}
+                <TabsContent value="logistics" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Truck className="h-5 w-5 text-emerald-500" />
+                                <span>Active Organ Transports & Route Intelligence</span>
+                            </CardTitle>
+                            <CardDescription>
+                                Continuous cold ischemia countdown, multi-modal route feasibility, and milestone tracking.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Tracking Code</TableHead>
+                                        <TableHead>Organ ID</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Preservation Window</TableHead>
+                                        <TableHead>Risk Level</TableHead>
+                                        <TableHead>Feasibility</TableHead>
+                                        <TableHead className="text-right">Coordinator Control</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {transportRequests.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                                No active organ transport requests found. Dispatch a transport plan from the <strong>Allocations</strong> tab.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        transportRequests.map((tr: any) => (
+                                            <TableRow
+                                                key={tr._id}
+                                                className={selectedTransportId === tr._id ? "bg-muted/40 cursor-pointer" : "cursor-pointer"}
+                                                onClick={() => setSelectedTransportId(tr._id)}
+                                            >
+                                                <TableCell className="font-mono text-xs font-semibold text-emerald-500">
+                                                    {tr.trackingCode}
+                                                </TableCell>
+                                                <TableCell className="font-mono text-xs">{tr.organId.substring(0, 8)}...</TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant={
+                                                            tr.status === "IN_TRANSIT"
+                                                                ? "default"
+                                                                : tr.status === "CONFIRMED"
+                                                                ? "secondary"
+                                                                : tr.status === "DELAYED"
+                                                                ? "destructive"
+                                                                : "outline"
+                                                        }
+                                                    >
+                                                        {tr.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="font-mono text-xs">
+                                                    {formatRemainingPreservation(tr.preservationDeadline)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge
+                                                        variant={
+                                                            tr.riskLevel === "LOW"
+                                                                ? "outline"
+                                                                : tr.riskLevel === "MODERATE"
+                                                                ? "secondary"
+                                                                : "destructive"
+                                                        }
+                                                    >
+                                                        {tr.riskLevel}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className={tr.feasibility === "FEASIBLE" ? "text-emerald-500 font-medium" : "text-amber-500 font-medium"}>
+                                                        {tr.feasibility}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="text-right space-x-1" onClick={(e) => e.stopPropagation()}>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => setSelectedTransportId(tr._id)}
+                                                    >
+                                                        Inspect
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+
+                    {/* Transport Detail Panel */}
+                    {selectedTransportId && transportDetails && (
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <MapPin className="h-4 w-4 text-primary" />
+                                            <span>Multi-Modal Route Options</span>
+                                        </CardTitle>
+                                        <Badge variant="outline">SIMULATION</Badge>
+                                    </div>
+                                    <CardDescription>
+                                        Evaluated transport modes against remaining cold ischemia clock.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    {transportDetails.options.map((opt: any) => (
+                                        <div
+                                            key={opt._id}
+                                            className={`p-3 rounded-lg border flex items-center justify-between ${
+                                                opt.isRecommended ? "border-emerald-500/60 bg-emerald-500/5" : "border-border"
+                                            }`}
+                                        >
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2">
+                                                    {opt.mode === "AIR_CHARTER" ? (
+                                                        <Plane className="h-4 w-4 text-blue-500" />
+                                                    ) : (
+                                                        <Truck className="h-4 w-4 text-emerald-500" />
+                                                    )}
+                                                    <span className="font-semibold text-sm">{opt.provider}</span>
+                                                    {opt.isRecommended && (
+                                                        <Badge className="bg-emerald-600 text-white text-[10px]">
+                                                            RECOMMENDED
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Duration: ~{opt.estimatedDurationMinutes} mins | Safety Buffer: {opt.safetyBufferMinutes} mins
+                                                </p>
+                                            </div>
+                                            {transportDetails.transport.status === "READY" && (
+                                                <Button
+                                                    size="sm"
+                                                    className="bg-primary text-primary-foreground"
+                                                    onClick={() => handleAssignCarrier(opt._id, opt.provider)}
+                                                >
+                                                    Assign
+                                                </Button>
+                                            )}
+                                        </div>
+                                    ))}
+
+                                    <div className="pt-3 border-t space-y-2">
+                                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                            Coordinator Milestone Updates
+                                        </p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {transportDetails.transport.status === "ASSIGNED" && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => handleUpdateMilestone("PICKUP_PENDING", "Donor Hospital Operating Room")}
+                                                >
+                                                    Mark Pickup Started
+                                                </Button>
+                                            )}
+                                            {transportDetails.transport.status === "PICKUP_PENDING" && (
+                                                <Button
+                                                    size="sm"
+                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                    onClick={() => handleUpdateMilestone("IN_TRANSIT", "En Route via Medical Transit Corridor")}
+                                                >
+                                                    Mark In Transit
+                                                </Button>
+                                            )}
+                                            {(transportDetails.transport.status === "IN_TRANSIT" || transportDetails.transport.status === "DELAYED") && (
+                                                <>
+                                                    <Button
+                                                        size="sm"
+                                                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                                                        onClick={() => handleUpdateMilestone("ARRIVED", "Destination Hospital Arrival Bay")}
+                                                    >
+                                                        Mark Arrived
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="text-amber-500 border-amber-500 hover:bg-amber-500/10"
+                                                        onClick={handleReportDelay}
+                                                    >
+                                                        <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Report Delay
+                                                    </Button>
+                                                </>
+                                            )}
+                                            {transportDetails.transport.status === "ARRIVED" && (
+                                                <Button
+                                                    size="sm"
+                                                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                    onClick={() => handleUpdateMilestone("DELIVERED", "Transplant Surgical Suite")}
+                                                >
+                                                    Mark Delivered
+                                                </Button>
+                                            )}
+                                            {transportDetails.transport.status === "DELIVERED" && (
+                                                <Button
+                                                    size="sm"
+                                                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                                                    onClick={() => handleUpdateMilestone("CONFIRMED", "Recipient Surgeon Handover Complete")}
+                                                >
+                                                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Confirm Handover
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-primary" />
+                                        <span>Verified Transport Timeline</span>
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Immutable chronological record of logistics dispatch events.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {transportDetails.alerts.length > 0 && (
+                                        <div className="space-y-2">
+                                            {transportDetails.alerts.map((al: any) => (
+                                                <div
+                                                    key={al._id}
+                                                    className={`p-2.5 rounded border text-xs flex items-center justify-between ${
+                                                        al.severity === "CRITICAL"
+                                                            ? "bg-red-500/10 border-red-500 text-red-500"
+                                                            : "bg-amber-500/10 border-amber-500 text-amber-500"
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <AlertOctagon className="h-4 w-4 shrink-0" />
+                                                        <span>{al.message}</span>
+                                                    </div>
+                                                    {al.status === "ACTIVE" && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-7 text-[11px]"
+                                                            onClick={() => handleAcknowledgeAlert(al._id)}
+                                                        >
+                                                            Acknowledge
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-3">
+                                        {transportDetails.events.map((ev: any) => (
+                                            <div key={ev._id} className="flex items-start gap-3 text-xs border-l-2 border-primary/30 pl-3 py-1">
+                                                <div className="font-mono text-muted-foreground shrink-0">
+                                                    {new Date(ev.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-foreground">{ev.eventType}</p>
+                                                    <p className="text-muted-foreground">{ev.locationDescription}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+                </TabsContent>
+
+                {/* Tab 5: Verification Center (Step 7 Core UI) */}
+                <TabsContent value="verification" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Scan className="h-5 w-5 text-cyan-500" />
+                                        <span>Physical-to-Digital Verification Center</span>
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Computer vision and OCR verification cross-referencing physical labels with authoritative records.
+                                    </CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Selected Verification Request Inspector */}
+                            {selectedVerificationRequest ? (
+                                <div className="space-y-6">
+                                    <div className="p-4 rounded-lg border bg-muted/20 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant="outline">{selectedVerificationRequest.verificationType}</Badge>
+                                                <span className="font-mono text-xs text-muted-foreground">
+                                                    Request ID: {selectedVerificationRequest._id.substring(0, 10)}...
+                                                </span>
+                                            </div>
+                                            <Badge
+                                                variant={
+                                                    selectedVerificationRequest.status === "VERIFIED"
+                                                        ? "default"
+                                                        : selectedVerificationRequest.status === "REJECTED"
+                                                        ? "destructive"
+                                                        : "secondary"
+                                                }
+                                            >
+                                                {selectedVerificationRequest.status}
+                                            </Badge>
+                                        </div>
+
+                                        {/* Side-by-Side Comparison */}
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            <div className="p-3.5 rounded border bg-card space-y-2 text-xs">
+                                                <div className="font-semibold text-sm flex items-center gap-1.5 text-primary">
+                                                    <ShieldCheck className="h-4 w-4" /> Authoritative Digital Record
+                                                </div>
+                                                <div className="space-y-1 text-muted-foreground pt-1">
+                                                    <div><strong>Identifier:</strong> {selectedVerificationRequest.authoritativeSnapshot?.identifier || "N/A"}</div>
+                                                    <div><strong>Organ Type:</strong> {selectedVerificationRequest.authoritativeSnapshot?.organ_type || "N/A"}</div>
+                                                    <div><strong>Blood Group:</strong> {selectedVerificationRequest.authoritativeSnapshot?.blood_group || "N/A"}</div>
+                                                    <div><strong>Facility:</strong> {selectedVerificationRequest.authoritativeSnapshot?.facility || "N/A"}</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-3.5 rounded border bg-card space-y-2 text-xs">
+                                                <div className="font-semibold text-sm flex items-center justify-between text-cyan-500">
+                                                    <span className="flex items-center gap-1.5">
+                                                        <Scan className="h-4 w-4" /> Extracted Physical Label
+                                                    </span>
+                                                    {selectedVerificationRequest.extractedData?.confidence && (
+                                                        <Badge variant="outline">
+                                                            OCR: {Math.round(selectedVerificationRequest.extractedData.confidence * 100)}%
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="space-y-1 text-muted-foreground pt-1">
+                                                    <div><strong>Identifier:</strong> {selectedVerificationRequest.extractedData?.fields?.identifier || "N/A"}</div>
+                                                    <div><strong>Organ Type:</strong> {selectedVerificationRequest.extractedData?.fields?.organ_type || "N/A"}</div>
+                                                    <div><strong>Blood Group:</strong> {selectedVerificationRequest.extractedData?.fields?.blood_group || "N/A"}</div>
+                                                    <div><strong>Barcode:</strong> {selectedVerificationRequest.extractedData?.fields?.barcode || "N/A"}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Comparison Verdict & Explanation */}
+                                        {selectedVerificationRequest.comparisonResult && (
+                                            <div className={`p-3 rounded border text-xs space-y-1 ${
+                                                selectedVerificationRequest.comparisonResult.status === "MATCH"
+                                                    ? "bg-emerald-500/10 border-emerald-500 text-emerald-500"
+                                                    : selectedVerificationRequest.comparisonResult.status === "MISMATCH"
+                                                    ? "bg-red-500/10 border-red-500 text-red-500"
+                                                    : "bg-amber-500/10 border-amber-500 text-amber-500"
+                                            }`}>
+                                                <div className="font-semibold flex items-center gap-1.5">
+                                                    <span>Verdict: {selectedVerificationRequest.comparisonResult.status}</span>
+                                                </div>
+                                                <p>{selectedVerificationRequest.comparisonResult.explanation}</p>
+                                                {selectedVerificationRequest.comparisonResult.mismatches?.length > 0 && (
+                                                    <div className="pt-2 space-y-1">
+                                                        {selectedVerificationRequest.comparisonResult.mismatches.map((m: any, idx: number) => (
+                                                            <div key={idx}>
+                                                                ⚠ Discrepancy on <strong>{m.field}</strong>: Expected [{m.expected}], Observed [{m.observed}] ({m.severity})
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Coordinator Action Buttons */}
+                                        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleSubmitVerificationReview("RETRY_REQUESTED")}
+                                            >
+                                                Request Re-scan
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="text-red-500 border-red-500 hover:bg-red-500/10"
+                                                onClick={() => handleSubmitVerificationReview("REJECTED")}
+                                            >
+                                                <XCircle className="h-3.5 w-3.5 mr-1" /> Flag Mismatch / Reject
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                onClick={() => handleSubmitVerificationReview("VERIFIED")}
+                                            >
+                                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Confirm Verification
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-10 text-muted-foreground">
+                                    <Scan className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+                                    <p>Select a verification request from the history table below, or click <strong>Verify Label</strong> on an organ in Inventory.</p>
+                                </div>
+                            )}
+
+                            {/* Verification History Table */}
+                            <div className="space-y-3">
+                                <h4 className="text-sm font-semibold">Verification Audit Records</h4>
+                                <div className="rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Entity ID</TableHead>
+                                                <TableHead>Verification Type</TableHead>
+                                                <TableHead>Comparison Verdict</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead>Reviewer</TableHead>
+                                                <TableHead>Created At</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {verificationRequests.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                                                        No verification records yet. Run a label scan from the Inventory tab.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                verificationRequests.map((vr: any) => (
+                                                    <TableRow
+                                                        key={vr._id}
+                                                        className={selectedVerificationId === vr._id ? "bg-muted/40 cursor-pointer" : "cursor-pointer"}
+                                                        onClick={() => setSelectedVerificationId(vr._id)}
+                                                    >
+                                                        <TableCell className="font-mono text-xs">{vr.entityId.substring(0, 10)}...</TableCell>
+                                                        <TableCell className="text-xs">{vr.verificationType}</TableCell>
+                                                        <TableCell>
+                                                            <Badge
+                                                                variant={
+                                                                    vr.comparisonResult?.status === "MATCH"
+                                                                        ? "default"
+                                                                        : vr.comparisonResult?.status === "MISMATCH"
+                                                                        ? "destructive"
+                                                                        : "secondary"
+                                                                }
+                                                            >
+                                                                {vr.comparisonResult?.status || "PENDING"}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline">{vr.status}</Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-xs text-muted-foreground">
+                                                            {vr.reviewedBy || "Unreviewed"}
+                                                        </TableCell>
+                                                        <TableCell className="text-xs text-muted-foreground">
+                                                            {new Date(vr.createdAt).toLocaleDateString()}
+                                                        </TableCell>
+                                                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => setSelectedVerificationId(vr._id)}
+                                                            >
+                                                                Inspect
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Tab 6: Recipients */}
                 <TabsContent value="recipients" className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -704,7 +1398,7 @@ export default function HospitalOrgansPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 5: Organ Requests */}
+                {/* Tab 7: Organ Requests */}
                 <TabsContent value="requests" className="space-y-4">
                     <Card>
                         <CardHeader>

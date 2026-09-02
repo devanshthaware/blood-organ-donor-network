@@ -130,3 +130,53 @@ class OrganCompatibilityResponse(BaseModel):
     features: dict = Field(default_factory=dict, description="Normalized feature weights")
     explanation: str = Field(..., description="Brief ML inference summary")
 
+
+# ==========================================
+# CV & OCR VERIFICATION SCHEMAS (STEP 7)
+# ==========================================
+
+class BoundingBox(BaseModel):
+    field: str
+    x: float
+    y: float
+    width: float
+    height: float
+    confidence: float
+
+
+class OCRExtractRequest(BaseModel):
+    image_base64: str = Field(..., description="Base64-encoded image payload or data URI")
+    entity_type: str = Field(..., description="Target entity type (e.g. BLOOD_UNIT, ORGAN, DOCUMENT)")
+    verification_type: str = Field(..., description="Verification category")
+
+
+class OCRExtractResponse(BaseModel):
+    raw_text: str = Field(..., description="Raw extracted OCR text")
+    fields: dict = Field(default_factory=dict, description="Structured parsed key-value pairs")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Overall OCR confidence score")
+    bounding_boxes: list[BoundingBox] = Field(default_factory=list, description="Field spatial bounding coordinates")
+    image_quality: dict = Field(default_factory=dict, description="Image quality metrics (blur, resolution, usable)")
+    engine: str = Field("VeinLink-Vision-OCR-Engine", description="Active OCR engine")
+    engine_version: str = Field("1.0.0", description="OCR model version")
+
+
+class LabelVerificationRequest(BaseModel):
+    extracted_fields: dict = Field(..., description="Extracted physical label fields from OCR")
+    expected_fields: dict = Field(..., description="Authoritative Convex database record fields")
+    entity_type: str = Field(..., description="Target entity type")
+
+
+class MismatchItem(BaseModel):
+    field: str
+    expected: str
+    observed: str
+    severity: str  # INFO, WARNING, CRITICAL
+
+
+class LabelVerificationResponse(BaseModel):
+    status: str  # MATCH, PARTIAL_MATCH, MISMATCH, REVIEW_REQUIRED
+    confidence: float
+    mismatches: list[MismatchItem]
+    explanation: str
+
+

@@ -10,7 +10,9 @@
     "verify:migration": "tsx scripts/verify-migration.ts",
     "test:organ-domain": "tsx scripts/test-organ-domain.ts",
     "test:organ-matching": "tsx scripts/test-organ-matching.ts",
-    "test:organ-allocation": "tsx scripts/test-organ-allocation.ts"
+    "test:organ-allocation": "tsx scripts/test-organ-allocation.ts",
+    "test:organ-logistics": "tsx scripts/test-organ-logistics.ts",
+    "test:cv-verification": "tsx scripts/test-cv-verification.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.8.4",
