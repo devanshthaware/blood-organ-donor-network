@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useQuery, useMutation } from "convex/react"
+import { useQuery, useMutation, useAction } from "convex/react"
 import { api } from "../../../../convex/_generated/api"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,19 +20,70 @@ import {
     Building2,
     Calendar,
     AlertTriangle,
+    Sparkles,
+    ArrowRight,
+    Search,
 } from "lucide-react"
-import { ORGAN_TYPES } from "@/lib/domain-types"
 
 export default function HospitalOrgansPage() {
     const [activeTab, setActiveTab] = useState("inventory")
+    const [selectedOrganId, setSelectedOrganId] = useState<string | null>(null)
+    const [isMatchingRunning, setIsMatchingRunning] = useState(false)
 
     const inventory = useQuery((api as any).organInventory?.getAllOrganInventory, {}) || []
     const recipients = useQuery((api as any).recipients?.getAllRecipients, {}) || []
     const requests = useQuery((api as any).organRequests?.getAllOrganRequests, {}) || []
     const allocations = useQuery((api as any).organAllocations?.getAllocations, {}) || []
 
+    const selectedMatches = useQuery(
+        (api as any).organMatching?.getMatchesByOrgan,
+        selectedOrganId ? { organId: selectedOrganId } : "skip"
+    ) || []
+
+    const runMatchingAction = useAction((api as any).organMatching?.actions?.runOrganMatching)
+    const submitAllocationReviewMutation = useMutation(
+        (api as any).organAllocations?.submitAllocationReview
+    )
     const approveAllocationMutation = useMutation((api as any).organAllocations?.approveAllocation)
     const rejectAllocationMutation = useMutation((api as any).organAllocations?.rejectAllocation)
+
+    const handleRunMatching = async (organId: string) => {
+        setSelectedOrganId(organId)
+        setActiveTab("matches")
+        setIsMatchingRunning(true)
+        try {
+            const result = await runMatchingAction({ organId })
+            alert(
+                `Matching engine evaluated ${result.candidatesEvaluated} requests and generated ${result.matchesGenerated} ranked candidates.`
+            )
+        } catch (err: any) {
+            alert(err?.message || "Failed to execute matching analysis.")
+        } finally {
+            setIsMatchingRunning(false)
+        }
+    }
+
+    const handleSelectForAllocationReview = async (match: any) => {
+        const reason = prompt(
+            "Enter preliminary clinical reason to advance candidate to allocation review:",
+            "High priority matching candidate meeting clinical feasibility criteria."
+        )
+        if (!reason) return
+
+        try {
+            await submitAllocationReviewMutation({
+                organId: match.organId,
+                recipientId: match.recipientId,
+                requestId: match.requestId,
+                matchId: match._id,
+                proposedReason: reason,
+            })
+            alert("Candidate advanced to Allocation Review. Organ placed in MATCHING review state.")
+            setActiveTab("allocations")
+        } catch (err: any) {
+            alert(err?.message || "Failed to submit for allocation review.")
+        }
+    }
 
     const handleApprove = async (allocationId: string) => {
         const reason = prompt("Enter clinical justification for allocation approval:")
@@ -82,7 +133,7 @@ export default function HospitalOrgansPage() {
                     <h2 className="text-3xl font-bold tracking-tight">Organ Donor Network</h2>
                 </div>
                 <p className="text-muted-foreground mt-1">
-                    Manage organ inventory, recipient candidate waitlists, transplant requests, and authorized allocations.
+                    Multi-factor compatibility evaluation, candidate recommendation ranking, and authorized human governance.
                 </p>
             </div>
 
@@ -97,7 +148,7 @@ export default function HospitalOrgansPage() {
                         <div className="text-2xl font-bold">
                             {inventory.filter((o: any) => o.status === "AVAILABLE").length}
                         </div>
-                        <p className="text-xs text-muted-foreground">Verified in preservation window</p>
+                        <p className="text-xs text-muted-foreground">Viable within cold ischemia clock</p>
                     </CardContent>
                 </Card>
 
@@ -143,20 +194,24 @@ export default function HospitalOrgansPage() {
 
             {/* Navigation Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-                <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-                    <TabsTrigger value="inventory" className="flex items-center gap-2">
+                <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+                    <TabsTrigger value="inventory" className="flex items-center gap-1.5">
                         <Heart className="h-4 w-4" />
-                        <span>Organ Inventory</span>
+                        <span>Inventory</span>
                     </TabsTrigger>
-                    <TabsTrigger value="recipients" className="flex items-center gap-2">
+                    <TabsTrigger value="matches" className="flex items-center gap-1.5">
+                        <Sparkles className="h-4 w-4 text-amber-500" />
+                        <span>Candidate Matches</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="recipients" className="flex items-center gap-1.5">
                         <Users className="h-4 w-4" />
                         <span>Recipients</span>
                     </TabsTrigger>
-                    <TabsTrigger value="requests" className="flex items-center gap-2">
+                    <TabsTrigger value="requests" className="flex items-center gap-1.5">
                         <GitPullRequest className="h-4 w-4" />
-                        <span>Organ Requests</span>
+                        <span>Requests</span>
                     </TabsTrigger>
-                    <TabsTrigger value="allocations" className="flex items-center gap-2">
+                    <TabsTrigger value="allocations" className="flex items-center gap-1.5">
                         <ShieldCheck className="h-4 w-4" />
                         <span>Allocations</span>
                     </TabsTrigger>
@@ -168,7 +223,7 @@ export default function HospitalOrgansPage() {
                         <CardHeader>
                             <CardTitle>Identified & Available Organs</CardTitle>
                             <CardDescription>
-                                Organs currently tracked in the network with active cold ischemia preservation clocks.
+                                Tracked organs with active preservation clocks. Run the matching engine to rank eligible recipient candidates.
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -179,13 +234,14 @@ export default function HospitalOrgansPage() {
                                         <TableHead>Blood Group</TableHead>
                                         <TableHead>Status</TableHead>
                                         <TableHead>Preservation Window</TableHead>
-                                        <TableHead>Current Facility</TableHead>
+                                        <TableHead>Facility</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {inventory.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                                 No organs currently registered in network inventory.
                                             </TableCell>
                                         </TableRow>
@@ -217,6 +273,17 @@ export default function HospitalOrgansPage() {
                                                 <TableCell className="text-muted-foreground font-mono text-xs">
                                                     {organ.currentFacilityId.substring(0, 12)}...
                                                 </TableCell>
+                                                <TableCell className="text-right">
+                                                    {(organ.status === "AVAILABLE" || organ.status === "MATCHING") && (
+                                                        <Button
+                                                            size="sm"
+                                                            className="bg-red-600 hover:bg-red-700 text-white"
+                                                            onClick={() => handleRunMatching(organ._id)}
+                                                        >
+                                                            <Sparkles className="h-3.5 w-3.5 mr-1" /> Find Matches
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
                                             </TableRow>
                                         ))
                                     )}
@@ -226,7 +293,119 @@ export default function HospitalOrgansPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 2: Recipients */}
+                {/* Tab 2: Candidate Matches (Step 4 Core UI) */}
+                <TabsContent value="matches" className="space-y-4">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle>Recommended Candidate Matches</CardTitle>
+                                    <CardDescription>
+                                        Policy-constrained candidate ranking with deterministic explanations. (Recommendations only — does not allocate).
+                                    </CardDescription>
+                                </div>
+                                {selectedOrganId && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleRunMatching(selectedOrganId)}
+                                        disabled={isMatchingRunning}
+                                    >
+                                        {isMatchingRunning ? "Analyzing..." : "Re-evaluate Matching"}
+                                    </Button>
+                                )}
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {!selectedOrganId ? (
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <Search className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p>Select an available organ from the <strong>Inventory</strong> tab to evaluate and rank candidate matches.</p>
+                                </div>
+                            ) : isMatchingRunning ? (
+                                <div className="text-center py-12 text-muted-foreground animate-pulse">
+                                    Evaluating hard constraints, calculating multi-factor scores, and consulting ML layer...
+                                </div>
+                            ) : selectedMatches.length === 0 ? (
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <AlertTriangle className="h-10 w-10 mx-auto text-amber-500/50 mb-3" />
+                                    <p className="font-medium text-foreground">No eligible candidates passed hard constraints.</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Check organ type requisitions, active request statuses, and clinical verification states.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {selectedMatches.map((match: any) => (
+                                        <Card key={match._id} className="border-border/60 hover:border-red-500/40 transition-colors">
+                                            <CardContent className="p-5">
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <Badge className="bg-primary text-primary-foreground font-mono">
+                                                                Rank #{match.ranking}
+                                                            </Badge>
+                                                            <span className="font-semibold text-base">
+                                                                Candidate Recipient: {match.recipientId.substring(0, 10)}...
+                                                            </span>
+                                                            <Badge variant="outline">
+                                                                Score: {Math.round(match.score * 100)}%
+                                                            </Badge>
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                {match.dataConfidence || "HIGH"} Confidence
+                                                            </Badge>
+                                                        </div>
+                                                        <p className="text-sm text-foreground/90 font-medium mt-1">
+                                                            {match.explanation}
+                                                        </p>
+                                                    </div>
+
+                                                    <Button
+                                                        size="sm"
+                                                        className="bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+                                                        onClick={() => handleSelectForAllocationReview(match)}
+                                                    >
+                                                        Advance to Review <ArrowRight className="h-4 w-4 ml-1" />
+                                                    </Button>
+                                                </div>
+
+                                                {/* Factors & Warnings */}
+                                                <div className="mt-4 grid md:grid-cols-2 gap-3 pt-3 border-t text-xs">
+                                                    <div>
+                                                        <span className="font-semibold text-muted-foreground block mb-1">
+                                                            Evaluation Factors:
+                                                        </span>
+                                                        <ul className="space-y-0.5 text-muted-foreground">
+                                                            <li>• Distance: {Math.round(match.compatibilitySummary.distanceKm)} km</li>
+                                                            <li>• Blood Match: {match.compatibilitySummary.bloodCompatibility ? "Compatible" : "Incompatible"}</li>
+                                                            <li>• Policy: {match.policyVersion || "2026.1-NATIONAL-POLICY"}</li>
+                                                            <li>• Algorithm: {match.algorithmVersion || "1.0.0-DETERMINISTIC"}</li>
+                                                        </ul>
+                                                    </div>
+
+                                                    {match.warnings && match.warnings.length > 0 && (
+                                                        <div>
+                                                            <span className="font-semibold text-amber-500 block mb-1">
+                                                                Clinical & Logistical Warnings:
+                                                            </span>
+                                                            <ul className="space-y-0.5 text-amber-500/90">
+                                                                {match.warnings.map((w: string, i: number) => (
+                                                                    <li key={i}>{w}</li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* Tab 3: Recipients */}
                 <TabsContent value="recipients" className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -286,7 +465,7 @@ export default function HospitalOrgansPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 3: Organ Requests */}
+                {/* Tab 4: Organ Requests */}
                 <TabsContent value="requests" className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -340,7 +519,7 @@ export default function HospitalOrgansPage() {
                     </Card>
                 </TabsContent>
 
-                {/* Tab 4: Allocations */}
+                {/* Tab 5: Allocations */}
                 <TabsContent value="allocations" className="space-y-4">
                     <Card>
                         <CardHeader>

@@ -112,3 +112,21 @@ class AvailabilityRequest(BaseModel):
     def dict(self, **kwargs):
         """Alias for model_dump for backward compatibility"""
         return self.model_dump(**kwargs)
+
+
+class OrganCompatibilityRequest(BaseModel):
+    organ_type: str = Field(..., description="Organ type (e.g. KIDNEY, LIVER)")
+    donor_blood: str = Field(..., description="Donor ABO blood group")
+    recipient_blood: str = Field(..., description="Recipient ABO blood group")
+    urgency: str = Field(..., description="Recipient urgency tier")
+    distance_km: float = Field(..., ge=0.0, le=5000.0, description="Logistical distance in km")
+    remaining_preservation_hours: float = Field(..., ge=0.0, le=120.0, description="Remaining cold ischemia time in hours")
+
+
+class OrganCompatibilityResponse(BaseModel):
+    score: float = Field(..., ge=0.0, le=1.0, description="Predicted multi-factor compatibility score")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Model prediction confidence")
+    model_version: str = Field(..., description="Active ML inference model version")
+    features: dict = Field(default_factory=dict, description="Normalized feature weights")
+    explanation: str = Field(..., description="Brief ML inference summary")
+

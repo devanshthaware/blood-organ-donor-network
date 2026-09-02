@@ -391,6 +391,11 @@ export default defineSchema({
     constraints: v.array(v.string()),
     explanation: v.string(),
     modelVersion: v.string(),
+    policyVersion: v.optional(v.string()),
+    algorithmVersion: v.optional(v.string()),
+    warnings: v.optional(v.array(v.string())),
+    factorBreakdown: v.optional(v.any()),
+    dataConfidence: v.optional(v.string()),
     status: v.union(
       v.literal("PROPOSED"),
       v.literal("REVIEWING"),
